@@ -24,7 +24,6 @@ import { getAuthTypeMetadataSS, getCurrentUserSS } from "@/lib/userSS";
 import { Suspense } from "react";
 import PostHogPageView from "./PostHogPageView";
 import Script from "next/script";
-import { Hanken_Grotesk } from "next/font/google";
 import { WebVitals } from "./web-vitals";
 import { ThemeProvider } from "next-themes";
 import CloudError from "@/components/errorPages/CloudErrorPage";
@@ -40,12 +39,6 @@ const inter = Inter({
   display: "swap",
 });
 
-const hankenGrotesk = Hanken_Grotesk({
-  subsets: ["latin"],
-  variable: "--font-hanken-grotesk",
-  display: "swap",
-});
-
 export async function generateMetadata(): Promise<Metadata> {
   let logoLocation = buildClientUrl("/onyx.ico");
   let enterpriseSettings: EnterpriseSettings | null = null;
@@ -58,7 +51,7 @@ export async function generateMetadata(): Promise<Metadata> {
   }
 
   return {
-    title: enterpriseSettings?.application_name || "Onyx",
+    title: enterpriseSettings?.application_name || "MaticMind",
     description: "Question answering for your documents",
     icons: {
       icon: logoLocation,
@@ -87,7 +80,7 @@ export default async function RootLayout({
   const getPageContent = async (content: React.ReactNode) => (
     <html
       lang="en"
-      className={`${inter.variable} ${hankenGrotesk.variable}`}
+      className={`${inter.variable}`}
       suppressHydrationWarning
     >
       <head>
@@ -122,7 +115,7 @@ export default async function RootLayout({
         )}
       </head>
 
-      <body className={`relative ${inter.variable} font-hanken`}>
+      <body className={`relative ${inter.variable} font-jost`}>
         <ThemeProvider
           attribute="class"
           defaultTheme="system"

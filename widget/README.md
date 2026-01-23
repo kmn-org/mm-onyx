@@ -94,7 +94,7 @@ That's it! The widget will appear as a floating button in the bottom-right corne
           └─ Input Area
               ├─ Text Input
               ├─ Send Button
-              └─ "Powered by Onyx" Footer
+              └─ "Powered by MaticMind" Footer
 ```
 
 ## Configuration Options

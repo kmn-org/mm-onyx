@@ -1,6 +1,6 @@
-@import url("https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600;700&display=swap");
 @import url("https://fonts.googleapis.com/css2?family=DM+Mono:wght@400&display=swap");
 
+@import "css/fonts.css";
 @import "css/attachment-button.css";
 @import "css/button.css";
 @import "css/card.css";
@@ -163,8 +163,9 @@
 
 /* Font Family Variables */
 :root {
-  --font-hanken-grotesk: "Hanken Grotesk", -apple-system, BlinkMacSystemFont,
+  --font-jost: "Jost", -apple-system, BlinkMacSystemFont,
     "Segoe UI", Roboto, sans-serif;
+  --font-hanken-grotesk: var(--font-jost); /* Alias for compatibility */
   --font-dm-mono: "DM Mono", "SF Mono", Monaco, "Cascadia Code", "Roboto Mono",
     Consolas, "Courier New", monospace;
 }
