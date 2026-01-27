@@ -1,6 +1,6 @@
 /* Input styling */
 .input-normal {
-  background-color: var(--background-neutral-00);
+  background-color: var(--background-tint-01);
   border: 1px solid var(--border-01);
 }
 .input-normal:hover {
@@ -16,7 +16,7 @@
 }
 
 .input-error {
-  background-color: var(--background-neutral-00);
+  background-color: var(--background-tint-01);
   border: 1px solid var(--status-error-05);
 }
 
