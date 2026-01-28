@@ -187,7 +187,7 @@ export default function NewTeamModal() {
                   className="w-full"
                   rightIcon={SvgArrowRight}
                 >
-                  Try MaticMind while waiting
+                  Try Maticmind while waiting
                 </Button>
               </div>
             </div>

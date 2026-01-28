@@ -114,7 +114,7 @@ function Footer() {
 
   const customFooterContent =
     settings?.enterpriseSettings?.custom_lower_disclaimer_content ||
-    `[MaticMind ${
+    `[Maticmind ${
       settings?.webVersion || "dev"
     }](https://www.maticmind.it/) - Open Source AI Platform`;
 

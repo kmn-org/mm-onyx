@@ -119,7 +119,7 @@ test.describe("First user onboarding flow", () => {
       }
 
       const tryOnyxButton = page
-        .getByRole("button", { name: /Try MaticMind while waiting/i })
+        .getByRole("button", { name: /Try Maticmind while waiting/i })
         .first();
       if ((await tryOnyxButton.count()) > 0) {
         await tryOnyxButton.click();
@@ -145,7 +145,7 @@ test.describe("First user onboarding flow", () => {
     await letsGoButton.click();
 
     await expect(page.getByText("Step 1 of 3")).toBeVisible();
-    await expect(page.getByText("What should MaticMind call you?")).toBeVisible();
+    await expect(page.getByText("What should Maticmind call you?")).toBeVisible();
 
     const nameInput = page.getByPlaceholder("Your name").first();
     await nameInput.fill("Playwright Tester");

@@ -118,7 +118,7 @@ export default function FederatedOAuthModal() {
   }
 
   const applicationName =
-    settings?.enterpriseSettings?.application_name || "MaticMind";
+    settings?.enterpriseSettings?.application_name || "Maticmind";
 
   return (
     <Modal open>

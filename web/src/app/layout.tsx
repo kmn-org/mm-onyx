@@ -51,7 +51,7 @@ export async function generateMetadata(): Promise<Metadata> {
   }
 
   return {
-    title: enterpriseSettings?.application_name || "MaticMind",
+    title: enterpriseSettings?.application_name || "Maticmind",
     description: "Question answering for your documents",
     icons: {
       icon: logoLocation,

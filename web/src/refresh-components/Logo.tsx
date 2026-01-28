@@ -77,7 +77,7 @@ export default function Logo({ folded, size, className }: LogoProps) {
             )}
             nowrap
           >
-            Powered by MaticMind
+            Powered by Maticmind
           </Text>
         )}
       </div>

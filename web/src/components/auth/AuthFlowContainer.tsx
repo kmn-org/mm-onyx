@@ -20,7 +20,7 @@ export default function AuthFlowContainer({
         <div className="text-sm mt-6 text-center w-full text-white/80 dark:text-text-03 mainUiBody mx-auto">
           {footerContent ?? (
             <>
-              New to MaticMind?{" "}
+              New to Maticmind?{" "}
               <Link
                 href="/auth/signup"
                 className="text-white dark:text-text-05 mainUiAction underline transition-colors duration-200"

@@ -180,7 +180,7 @@ export const GmailMain = () => {
       {isAdmin && hasUploadedCredentials && (
         <>
           <Title className="mb-2 mt-6 ml-auto mr-auto">
-            Step 2: Authenticate with MaticMind
+            Step 2: Authenticate with Maticmind
           </Title>
           <GmailAuthSection
             setPopup={setPopup}
