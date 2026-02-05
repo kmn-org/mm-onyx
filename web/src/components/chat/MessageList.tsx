@@ -1,20 +1,21 @@
 "use client";
 
 import React, { useCallback, useMemo, useRef } from "react";
-import { Message } from "@/app/chat/interfaces";
+import { Message } from "@/app/app/interfaces";
 import { OnyxDocument, MinimalOnyxDocument } from "@/lib/search/interfaces";
-import HumanMessage from "@/app/chat/message/HumanMessage";
-import { ErrorBanner } from "@/app/chat/message/Resubmit";
+import HumanMessage from "@/app/app/message/HumanMessage";
+import { ErrorBanner } from "@/app/app/message/Resubmit";
 import { MinimalPersonaSnapshot } from "@/app/admin/assistants/interfaces";
 import { LlmDescriptor, LlmManager } from "@/lib/hooks";
-import AIMessage from "@/app/chat/message/messageComponents/AIMessage";
+import { cn } from "@/lib/utils";
+import AgentMessage from "@/app/app/message/messageComponents/AgentMessage";
 import Spacer from "@/refresh-components/Spacer";
 import {
   useCurrentMessageHistory,
   useCurrentMessageTree,
   useLoadingError,
   useUncaughtError,
-} from "@/app/chat/stores/useChatSessionStore";
+} from "@/app/app/stores/useChatSessionStore";
 
 export interface MessageListProps {
   liveAssistant: MinimalPersonaSnapshot;
@@ -113,7 +114,7 @@ const MessageList = React.memo(
     );
 
     return (
-      <div className="w-[min(50rem,100%)] h-full px-6 rounded-2xl backdrop-blur-md">
+      <div className="w-full max-w-[var(--app-page-main-content-width)] h-full pl-1.5">
         <Spacer />
         {messages.map((message, i) => {
           const messageReactComponentKey = `message-${message.nodeId}`;
@@ -181,8 +182,9 @@ const MessageList = React.memo(
                 key={messageReactComponentKey}
                 data-anchor={isAnchor ? "true" : undefined}
               >
-                <AIMessage
+                <AgentMessage
                   rawPackets={message.packets}
+                  packetCount={message.packetCount}
                   chatState={chatStateData}
                   nodeId={message.nodeId}
                   messageId={message.messageId}
@@ -194,6 +196,7 @@ const MessageList = React.memo(
                   onMessageSelection={onMessageSelection}
                   onRegenerate={createRegenerator}
                   parentMessage={previousMessage}
+                  processingDurationSeconds={message.processingDurationSeconds}
                 />
               </div>
             );

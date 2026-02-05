@@ -80,6 +80,7 @@ from onyx.server.query_and_chat.streaming_models import SearchToolQueriesDelta
 from onyx.server.query_and_chat.streaming_models import SearchToolStart
 from onyx.tools.interface import Tool
 from onyx.tools.models import SearchToolOverrideKwargs
+from onyx.tools.models import ToolCallException
 from onyx.tools.models import ToolResponse
 from onyx.tools.tool_implementations.search.constants import (
     KEYWORD_QUERY_HYBRID_ALPHA,
@@ -225,8 +226,8 @@ class SearchTool(Tool[SearchToolOverrideKwargs]):
         tool_id: int,
         db_session: Session,
         emitter: Emitter,
-        # Used for ACLs and federated search
-        user: User | None,
+        # Used for ACLs and federated search, anonymous users only see public docs
+        user: User,
         # Used for filter settings
         persona: Persona,
         llm: LLM,
@@ -531,6 +532,15 @@ class SearchTool(Tool[SearchToolOverrideKwargs]):
         # This prevents transaction conflicts when multiple search tools run in parallel
         db_session = self._get_thread_safe_session()
         try:
+            if QUERIES_FIELD not in llm_kwargs:
+                raise ToolCallException(
+                    message=f"Missing required '{QUERIES_FIELD}' parameter in internal_search tool call",
+                    llm_facing_message=(
+                        f"The internal_search tool requires a '{QUERIES_FIELD}' parameter "
+                        f"containing an array of search queries. Please provide the queries "
+                        f'like: {{"queries": ["your search query here"]}}'
+                    ),
+                )
             llm_queries = cast(list[str], llm_kwargs[QUERIES_FIELD])
 
             # Run semantic and keyword query expansion in parallel (unless skipped)
@@ -844,12 +854,12 @@ class SearchTool(Tool[SearchToolOverrideKwargs]):
                 f"document expansion: {document_expansion_elapsed:.3f}s)"
             )
 
-            # TODO: extension - this can include the smaller set of approved docs to be saved/displayed in the UI
-            # for replaying. Currently the full set is returned and saved.
             return ToolResponse(
                 # Typically the rich response will give more docs in case it needs to be displayed in the UI
                 rich_response=SearchDocsResponse(
-                    search_docs=search_docs, citation_mapping=citation_mapping
+                    search_docs=search_docs,
+                    citation_mapping=citation_mapping,
+                    displayed_docs=final_ui_docs or None,
                 ),
                 # The LLM facing response typically includes less docs to cut down on noise and token usage
                 llm_facing_response=docs_str,

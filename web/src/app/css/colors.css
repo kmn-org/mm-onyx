@@ -492,6 +492,9 @@
   --logo-text: var(--brand-blue-92);
   --logo-accent: var(--brand-teal-30);
   --logo-pictogram: var(--brand-teal-30);
+
+  /* Frost Overlay (for FrostedDiv component) - lighter in light mode */
+  --frost-overlay: var(--alpha-grey-00-10);
 }
 
 /* Dark Colors */
@@ -695,4 +698,7 @@
   --logo-text: var(--brand-teal-50);
   --logo-accent: var(--grey-00);
   --logo-pictogram: var(--brand-teal-50);
+
+  /* Frost Overlay (for FrostedDiv component) - darker in dark mode */
+  --frost-overlay: var(--alpha-grey-100-10);
 }

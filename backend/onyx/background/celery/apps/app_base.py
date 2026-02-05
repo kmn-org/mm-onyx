@@ -30,7 +30,7 @@ from onyx.configs.app_configs import ENABLE_OPENSEARCH_INDEXING_FOR_ONYX
 from onyx.configs.constants import ONYX_CLOUD_CELERY_TASK_PREFIX
 from onyx.configs.constants import OnyxRedisLocks
 from onyx.db.engine.sql_engine import get_sqlalchemy_engine
-from onyx.document_index.vespa.shared_utils.utils import (
+from onyx.document_index.opensearch.client import (
     wait_for_opensearch_with_timeout,
 )
 from onyx.document_index.vespa.shared_utils.utils import wait_for_vespa_with_timeout
@@ -43,6 +43,7 @@ from onyx.redis.redis_connector_prune import RedisConnectorPrune
 from onyx.redis.redis_document_set import RedisDocumentSet
 from onyx.redis.redis_pool import get_redis_client
 from onyx.redis.redis_usergroup import RedisUserGroup
+from onyx.tracing.braintrust_tracing import setup_braintrust_if_creds_available
 from onyx.utils.logger import ColoredFormatter
 from onyx.utils.logger import LoggerContextVars
 from onyx.utils.logger import PlainFormatter
@@ -236,6 +237,9 @@ def on_celeryd_init(sender: str, conf: Any = None, **kwargs: Any) -> None:
     logger.info(
         f"Multiprocessing selected start method: {multiprocessing.get_start_method()}"
     )
+
+    # Initialize Braintrust tracing in workers if credentials are available.
+    setup_braintrust_if_creds_available()
 
 
 def wait_for_redis(sender: Any, **kwargs: Any) -> None:

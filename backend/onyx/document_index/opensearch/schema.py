@@ -16,6 +16,10 @@ from onyx.document_index.opensearch.constants import DEFAULT_MAX_CHUNK_SIZE
 from onyx.document_index.opensearch.constants import EF_CONSTRUCTION
 from onyx.document_index.opensearch.constants import EF_SEARCH
 from onyx.document_index.opensearch.constants import M
+from onyx.document_index.opensearch.string_filtering import (
+    filter_and_validate_document_id,
+)
+from onyx.utils.tenant import get_tenant_id_short_string
 from shared_configs.configs import MULTI_TENANT
 from shared_configs.contextvars import get_current_tenant_id
 
@@ -46,20 +50,35 @@ CHUNK_CONTEXT_FIELD_NAME = "chunk_context"
 METADATA_SUFFIX_FIELD_NAME = "metadata_suffix"
 PRIMARY_OWNERS_FIELD_NAME = "primary_owners"
 SECONDARY_OWNERS_FIELD_NAME = "secondary_owners"
+# Hierarchy filtering - list of ancestor hierarchy node IDs
+ANCESTOR_HIERARCHY_NODE_IDS_FIELD_NAME = "ancestor_hierarchy_node_ids"
 
 
 def get_opensearch_doc_chunk_id(
-    document_id: str, chunk_index: int, max_chunk_size: int = DEFAULT_MAX_CHUNK_SIZE
+    tenant_state: TenantState,
+    document_id: str,
+    chunk_index: int,
+    max_chunk_size: int = DEFAULT_MAX_CHUNK_SIZE,
 ) -> str:
     """
     Returns a unique identifier for the chunk.
 
-    TODO(andrei): Add source type to this.
-    TODO(andrei): Add tenant ID to this.
-    TODO(andrei): Sanitize document_id in the event it contains characters that
-    are not allowed in OpenSearch IDs.
+    This will be the string used to identify the chunk in OpenSearch. Any direct
+    chunk queries should use this function.
     """
-    return f"{document_id}__{max_chunk_size}__{chunk_index}"
+    sanitized_document_id = filter_and_validate_document_id(document_id)
+    opensearch_doc_chunk_id = (
+        f"{sanitized_document_id}__{max_chunk_size}__{chunk_index}"
+    )
+    if tenant_state.multitenant:
+        # Use tenant ID because in multitenant mode each tenant has its own
+        # Documents table, so there is a very small chance that doc IDs are not
+        # actually unique across all tenants.
+        short_tenant_id = get_tenant_id_short_string(tenant_state.tenant_id)
+        opensearch_doc_chunk_id = f"{short_tenant_id}__{opensearch_doc_chunk_id}"
+    # Do one more validation to ensure we haven't exceeded the max length.
+    opensearch_doc_chunk_id = filter_and_validate_document_id(opensearch_doc_chunk_id)
+    return opensearch_doc_chunk_id
 
 
 def set_or_convert_timezone_to_utc(value: datetime) -> datetime:
@@ -134,6 +153,11 @@ class DocumentChunk(BaseModel):
     primary_owners: list[str] | None = None
     secondary_owners: list[str] | None = None
 
+    # List of ancestor hierarchy node IDs for hierarchy-based filtering.
+    # None means no hierarchy info (document will be excluded from
+    # hierarchy-filtered searches).
+    ancestor_hierarchy_node_ids: list[int] | None = None
+
     tenant_id: TenantState = Field(
         default_factory=lambda: TenantState(
             tenant_id=get_current_tenant_id(), multitenant=MULTI_TENANT
@@ -172,24 +196,23 @@ class DocumentChunk(BaseModel):
         return serialized_exclude_none
 
     @field_serializer("last_updated", mode="wrap")
-    def serialize_datetime_fields_to_epoch_millis(
+    def serialize_datetime_fields_to_epoch_seconds(
         self, value: datetime | None, handler: SerializerFunctionWrapHandler
     ) -> int | None:
         """
-        Serializes datetime fields to milliseconds since the Unix epoch.
+        Serializes datetime fields to seconds since the Unix epoch.
 
         If there is no datetime, returns None.
         """
         if value is None:
             return None
         value = set_or_convert_timezone_to_utc(value)
-        # timestamp returns a float in seconds so convert to millis.
-        return int(value.timestamp() * 1000)
+        return int(value.timestamp())
 
     @field_validator("last_updated", mode="before")
     @classmethod
-    def parse_epoch_millis_to_datetime(cls, value: Any) -> datetime | None:
-        """Parses milliseconds since the Unix epoch to a datetime object.
+    def parse_epoch_seconds_to_datetime(cls, value: Any) -> datetime | None:
+        """Parses seconds since the Unix epoch to a datetime object.
 
         If the input is None, returns None.
 
@@ -204,7 +227,7 @@ class DocumentChunk(BaseModel):
             raise ValueError(
                 f"Bug: Expected an int for the last_updated property from OpenSearch, got {type(value)} instead."
             )
-        return datetime.fromtimestamp(value / 1000, tz=timezone.utc)
+        return datetime.fromtimestamp(value, tz=timezone.utc)
 
     @field_serializer("tenant_id", mode="wrap")
     def serialize_tenant_state(
@@ -354,11 +377,9 @@ class DocumentSchema:
                 },
                 SOURCE_TYPE_FIELD_NAME: {"type": "keyword"},
                 METADATA_LIST_FIELD_NAME: {"type": "keyword"},
-                # TODO(andrei): Check if Vespa stores seconds, we may wanna do
-                # seconds here not millis.
                 LAST_UPDATED_FIELD_NAME: {
                     "type": "date",
-                    "format": "epoch_millis",
+                    "format": "epoch_second",
                     # For some reason date defaults to False, even though it
                     # would make sense to sort by date.
                     "doc_values": True,
@@ -366,14 +387,21 @@ class DocumentSchema:
                 # Access control fields.
                 # Whether the doc is public. Could have fallen under access
                 # control list but is such a broad and critical filter that it
-                # is its own field.
+                # is its own field. If true, ACCESS_CONTROL_LIST_FIELD_NAME
+                # should have no effect on queries.
                 PUBLIC_FIELD_NAME: {"type": "boolean"},
                 # Access control list for the doc, excluding public access,
                 # which is covered above.
+                # If a user's access set contains at least one entry from this
+                # set, the user should be able to retrieve this document. This
+                # only applies if public is set to false; public non-hidden
+                # documents are always visible to anyone in a given tenancy
+                # regardless of this field.
                 ACCESS_CONTROL_LIST_FIELD_NAME: {"type": "keyword"},
-                # Whether the doc is hidden from search results. Should clobber
-                # all other search filters; up to search implementations to
-                # guarantee this.
+                # Whether the doc is hidden from search results.
+                # Should clobber all other access search filters, namely
+                # PUBLIC_FIELD_NAME and ACCESS_CONTROL_LIST_FIELD_NAME; up to
+                # search implementations to guarantee this.
                 HIDDEN_FIELD_NAME: {"type": "boolean"},
                 GLOBAL_BOOST_FIELD_NAME: {"type": "integer"},
                 # This field is only used for displaying a useful name for the
@@ -447,8 +475,13 @@ class DocumentSchema:
                 DOCUMENT_ID_FIELD_NAME: {"type": "keyword"},
                 CHUNK_INDEX_FIELD_NAME: {"type": "integer"},
                 # The maximum number of tokens this chunk's content can hold.
-                # TODO(andrei): Can we generalize this to embedding type?
                 MAX_CHUNK_SIZE_FIELD_NAME: {"type": "integer"},
+                # Hierarchy filtering - list of ancestor hierarchy node IDs.
+                # Used for scoped search within folder/space hierarchies.
+                # OpenSearch's terms query with value_type: "bitmap" can
+                # efficiently check if any value in this array matches a
+                # query bitmap.
+                ANCESTOR_HIERARCHY_NODE_IDS_FIELD_NAME: {"type": "integer"},
             },
         }
 
@@ -473,16 +506,22 @@ class DocumentSchema:
         }
 
     @staticmethod
-    def get_bulk_index_settings() -> dict[str, Any]:
+    def get_index_settings_for_aws_managed_opensearch() -> dict[str, Any]:
         """
-        Optimized settings for bulk indexing: disable refresh and replicas.
+        Settings for AWS-managed OpenSearch.
+
+        Our AWS-managed OpenSearch cluster has 3 data nodes in 3 availability
+        zones.
+          - We use 3 shards to distribute load across all data nodes.
+          - We use 2 replicas to ensure each shard has a copy in each
+            availability zone. This is a hard requirement from AWS. The number
+            of data copies, including the primary (not a replica) copy, must be
+            divisible by the number of AZs.
         """
         return {
             "index": {
-                "number_of_shards": 1,
-                "number_of_replicas": 0,  # No replication during bulk load.
-                # Disables auto-refresh, improves performance in pure indexing (no searching) scenarios.
-                "refresh_interval": "-1",
+                "number_of_shards": 3,
+                "number_of_replicas": 2,
                 # Required for vector search.
                 "knn": True,
                 "knn.algo_param.ef_search": EF_SEARCH,

@@ -1,16 +1,11 @@
-import os
-import traceback
 from collections.abc import Iterator
 from typing import Any
 from typing import cast
 from typing import TYPE_CHECKING
 from typing import Union
 
-from langchain_core.messages import BaseMessage
-
 from onyx.configs.app_configs import MOCK_LLM_RESPONSE
 from onyx.configs.chat_configs import QA_TIMEOUT
-from onyx.configs.model_configs import DEFAULT_REASONING_EFFORT
 from onyx.configs.model_configs import GEN_AI_TEMPERATURE
 from onyx.configs.model_configs import LITELLM_EXTRA_BODY
 from onyx.llm.constants import LlmProviderNames
@@ -24,21 +19,39 @@ from onyx.llm.interfaces import ToolChoiceOptions
 from onyx.llm.model_response import ModelResponse
 from onyx.llm.model_response import ModelResponseStream
 from onyx.llm.model_response import Usage
+from onyx.llm.models import ANTHROPIC_REASONING_EFFORT_BUDGET
 from onyx.llm.models import OPENAI_REASONING_EFFORT
 from onyx.llm.utils import build_litellm_passthrough_kwargs
 from onyx.llm.utils import is_true_openai_model
 from onyx.llm.utils import model_is_reasoning_model
+from onyx.llm.well_known_providers.constants import AWS_ACCESS_KEY_ID_KWARG
+from onyx.llm.well_known_providers.constants import (
+    AWS_ACCESS_KEY_ID_KWARG_ENV_VAR_FORMAT,
+)
+from onyx.llm.well_known_providers.constants import (
+    AWS_BEARER_TOKEN_BEDROCK_KWARG_ENV_VAR_FORMAT,
+)
+from onyx.llm.well_known_providers.constants import AWS_REGION_NAME_KWARG
+from onyx.llm.well_known_providers.constants import AWS_REGION_NAME_KWARG_ENV_VAR_FORMAT
+from onyx.llm.well_known_providers.constants import AWS_SECRET_ACCESS_KEY_KWARG
+from onyx.llm.well_known_providers.constants import (
+    AWS_SECRET_ACCESS_KEY_KWARG_ENV_VAR_FORMAT,
+)
+from onyx.llm.well_known_providers.constants import OLLAMA_API_KEY_CONFIG_KEY
 from onyx.llm.well_known_providers.constants import VERTEX_CREDENTIALS_FILE_KWARG
+from onyx.llm.well_known_providers.constants import (
+    VERTEX_CREDENTIALS_FILE_KWARG_ENV_VAR_FORMAT,
+)
 from onyx.llm.well_known_providers.constants import VERTEX_LOCATION_KWARG
 from onyx.server.utils import mask_string
 from onyx.utils.logger import setup_logger
-from onyx.utils.long_term_log import LongTermLogger
 from onyx.utils.special_types import JSON_ro
 
 logger = setup_logger()
 
 if TYPE_CHECKING:
     from litellm import CustomStreamWrapper
+    from litellm import HTTPHandler
 
 
 _LLM_PROMPT_LONG_TERM_LOG_CATEGORY = "llm_prompt"
@@ -93,7 +106,6 @@ class LitellmLLM(LLM):
         extra_headers: dict[str, str] | None = None,
         extra_body: dict | None = LITELLM_EXTRA_BODY,
         model_kwargs: dict[str, Any] | None = None,
-        long_term_logger: LongTermLogger | None = None,
     ):
         self._timeout = timeout
         if timeout is None:
@@ -111,37 +123,39 @@ class LitellmLLM(LLM):
         self._api_base = api_base
         self._api_version = api_version
         self._custom_llm_provider = custom_llm_provider
-        self._long_term_logger = long_term_logger
         self._max_input_tokens = max_input_tokens
         self._custom_config = custom_config
 
         # Create a dictionary for model-specific arguments if it's None
         model_kwargs = model_kwargs or {}
 
-        # NOTE: have to set these as environment variables for Litellm since
-        # not all are able to passed in but they always support them set as env
-        # variables. We'll also try passing them in, since litellm just ignores
-        # addtional kwargs (and some kwargs MUST be passed in rather than set as
-        # env variables)
         if custom_config:
-            # Specifically pass in "vertex_credentials" / "vertex_location" as a
-            # model_kwarg to the completion call for vertex AI. More details here:
-            # https://docs.litellm.ai/docs/providers/vertex
             for k, v in custom_config.items():
                 if model_provider == LlmProviderNames.VERTEX_AI:
                     if k == VERTEX_CREDENTIALS_FILE_KWARG:
                         model_kwargs[k] = v
-                        continue
+                    elif k == VERTEX_CREDENTIALS_FILE_KWARG_ENV_VAR_FORMAT:
+                        model_kwargs[VERTEX_CREDENTIALS_FILE_KWARG] = v
                     elif k == VERTEX_LOCATION_KWARG:
                         model_kwargs[k] = v
-                        continue
-
-                # If there are any empty or null values,
-                # they MUST NOT be set in the env
-                if v is not None and v.strip():
-                    os.environ[k] = v
-                else:
-                    os.environ.pop(k, None)
+                elif model_provider == LlmProviderNames.OLLAMA_CHAT:
+                    if k == OLLAMA_API_KEY_CONFIG_KEY:
+                        model_kwargs["api_key"] = v
+                elif model_provider == LlmProviderNames.BEDROCK:
+                    if k == AWS_REGION_NAME_KWARG:
+                        model_kwargs[k] = v
+                    elif k == AWS_REGION_NAME_KWARG_ENV_VAR_FORMAT:
+                        model_kwargs[AWS_REGION_NAME_KWARG] = v
+                    elif k == AWS_BEARER_TOKEN_BEDROCK_KWARG_ENV_VAR_FORMAT:
+                        model_kwargs["api_key"] = v
+                    elif k == AWS_ACCESS_KEY_ID_KWARG:
+                        model_kwargs[k] = v
+                    elif k == AWS_ACCESS_KEY_ID_KWARG_ENV_VAR_FORMAT:
+                        model_kwargs[AWS_ACCESS_KEY_ID_KWARG] = v
+                    elif k == AWS_SECRET_ACCESS_KEY_KWARG:
+                        model_kwargs[k] = v
+                    elif k == AWS_SECRET_ACCESS_KEY_KWARG_ENV_VAR_FORMAT:
+                        model_kwargs[AWS_SECRET_ACCESS_KEY_KWARG] = v
 
         # Default vertex_location to "global" if not provided for Vertex AI
         # Latest gemini models are only available through the global region
@@ -153,7 +167,7 @@ class LitellmLLM(LLM):
 
         # This is needed for Ollama to do proper function calling
         if model_provider == LlmProviderNames.OLLAMA_CHAT and api_base is not None:
-            os.environ["OLLAMA_API_BASE"] = api_base
+            model_kwargs["api_base"] = api_base
         if extra_headers:
             model_kwargs.update({"extra_headers": extra_headers})
         if extra_body:
@@ -172,61 +186,6 @@ class LitellmLLM(LLM):
                 masked_config[k] = mask_string(v) if v else v
             dump["custom_config"] = masked_config
         return dump
-
-    def _record_call(
-        self,
-        prompt: LanguageModelInput,
-    ) -> None:
-        if self._long_term_logger:
-            prompt_json = _prompt_as_json(prompt)
-            self._long_term_logger.record(
-                {
-                    "prompt": prompt_json,
-                    "model": cast(JSON_ro, self._safe_model_config()),
-                },
-                category=_LLM_PROMPT_LONG_TERM_LOG_CATEGORY,
-            )
-
-    def _record_result(
-        self,
-        prompt: LanguageModelInput,
-        model_output: BaseMessage,
-    ) -> None:
-        if self._long_term_logger:
-            prompt_json = _prompt_as_json(prompt)
-            tool_calls = (
-                model_output.tool_calls if hasattr(model_output, "tool_calls") else []
-            )
-            self._long_term_logger.record(
-                {
-                    "prompt": prompt_json,
-                    "content": model_output.content,
-                    "tool_calls": cast(JSON_ro, tool_calls),
-                    "model": cast(JSON_ro, self._safe_model_config()),
-                },
-                category=_LLM_PROMPT_LONG_TERM_LOG_CATEGORY,
-            )
-
-    def _record_error(
-        self,
-        prompt: LanguageModelInput,
-        error: Exception,
-    ) -> None:
-        if self._long_term_logger:
-            prompt_json = _prompt_as_json(prompt)
-            self._long_term_logger.record(
-                {
-                    "prompt": prompt_json,
-                    "error": str(error),
-                    "traceback": "".join(
-                        traceback.format_exception(
-                            type(error), error, error.__traceback__
-                        )
-                    ),
-                    "model": cast(JSON_ro, self._safe_model_config()),
-                },
-                category=_LLM_PROMPT_LONG_TERM_LOG_CATEGORY,
-            )
 
     def _track_llm_cost(self, usage: Usage) -> None:
         """
@@ -277,13 +236,14 @@ class LitellmLLM(LLM):
         tool_choice: ToolChoiceOptions | None,
         stream: bool,
         parallel_tool_calls: bool,
-        reasoning_effort: ReasoningEffort | None = None,
+        reasoning_effort: ReasoningEffort = ReasoningEffort.AUTO,
         structured_response_format: dict | None = None,
         timeout_override: int | None = None,
         max_tokens: int | None = None,
         user_identity: LLMUserIdentity | None = None,
+        client: "HTTPHandler | None" = None,
     ) -> Union["ModelResponse", "CustomStreamWrapper"]:
-        self._record_call(prompt)
+        # Lazy loading to avoid memory bloat for non-inference flows
         from onyx.llm.litellm_singleton import litellm
         from litellm.exceptions import Timeout, RateLimitError
 
@@ -302,7 +262,7 @@ class LitellmLLM(LLM):
         is_ollama = self._model_provider == LlmProviderNames.OLLAMA_CHAT
         is_mistral = self._model_provider == LlmProviderNames.MISTRAL
         is_vertex_ai = self._model_provider == LlmProviderNames.VERTEX_AI
-        # Vertex Anthropic Opus 4.5 rejects output_config (LiteLLM maps reasoning_effort).
+        # Vertex Anthropic Opus 4.5 rejects output_config.
         # Keep this guard until LiteLLM/Vertex accept the field for this model.
         is_vertex_opus_4_5 = (
             is_vertex_ai and "claude-opus-4-5" in self.config.model_name.lower()
@@ -340,10 +300,11 @@ class LitellmLLM(LLM):
         if stream and not is_vertex_opus_4_5:
             optional_kwargs["stream_options"] = {"include_usage": True}
 
-        # Use configured default if not provided (if not set in env, low)
-        reasoning_effort = reasoning_effort or ReasoningEffort(DEFAULT_REASONING_EFFORT)
+        # Note, there is a reasoning_effort parameter in LiteLLM but it is completely jank and does not work for any
+        # of the major providers. Not setting it sets it to OFF.
         if (
             is_reasoning
+            # The default of this parameter not set is surprisingly not the equivalent of an Auto but is actually Off
             and reasoning_effort != ReasoningEffort.OFF
             and not is_vertex_opus_4_5
         ):
@@ -356,10 +317,38 @@ class LitellmLLM(LLM):
                         "effort": OPENAI_REASONING_EFFORT[reasoning_effort],
                         "summary": "auto",
                     }
+
+            if is_claude_model:
+                budget_tokens: int | None = ANTHROPIC_REASONING_EFFORT_BUDGET.get(
+                    reasoning_effort
+                )
+
+                if budget_tokens is not None:
+                    if max_tokens is not None:
+                        # Anthropic has a weird rule where max token has to be at least as much as budget tokens if set
+                        # and the minimum budget tokens is 1024
+                        # Will note that overwriting a developer set max tokens is not ideal but is the best we can do for now
+                        # It is better to allow the LLM to output more reasoning tokens even if it results in a fairly small tool
+                        # call as compared to reducing the budget for reasoning.
+                        max_tokens = max(budget_tokens + 1, max_tokens)
+                    optional_kwargs["thinking"] = {
+                        "type": "enabled",
+                        "budget_tokens": budget_tokens,
+                    }
+
+                # LiteLLM just does some mapping like this anyway but is incomplete for Anthropic
+                optional_kwargs.pop("reasoning_effort", None)
+
             else:
-                # Note that litellm auto maps reasoning_effort to thinking
-                # and budget_tokens for Anthropic Claude models
-                optional_kwargs["reasoning_effort"] = reasoning_effort
+                # Hope for the best from LiteLLM
+                if reasoning_effort in [
+                    ReasoningEffort.LOW,
+                    ReasoningEffort.MEDIUM,
+                    ReasoningEffort.HIGH,
+                ]:
+                    optional_kwargs["reasoning_effort"] = reasoning_effort.value
+                else:
+                    optional_kwargs["reasoning_effort"] = ReasoningEffort.LOW.value
 
         if tools:
             # OpenAI will error if parallel_tool_calls is True and tools are not specified
@@ -383,12 +372,17 @@ class LitellmLLM(LLM):
         )
 
         try:
-            # NOTE: must pass in None instead of empty strings
-            # otherwise litellm can have some issues with bedrock
+            # NOTE: must pass in None instead of empty strings otherwise litellm
+            # can have some issues with bedrock.
+            # NOTE: Sometimes _model_kwargs may have an "api_key" kwarg
+            # depending on what the caller passes in for custom_config. If it
+            # does we allow it to clobber _api_key.
+            if "api_key" not in passthrough_kwargs:
+                passthrough_kwargs["api_key"] = self._api_key or None
+
             response = litellm.completion(
                 mock_response=MOCK_LLM_RESPONSE,
                 model=model,
-                api_key=self._api_key or None,
                 base_url=self._api_base or None,
                 api_version=self._api_version or None,
                 custom_llm_provider=self._custom_llm_provider or None,
@@ -399,12 +393,12 @@ class LitellmLLM(LLM):
                 temperature=temperature,
                 timeout=timeout_override or self._timeout,
                 max_tokens=max_tokens,
+                client=client,
                 **optional_kwargs,
                 **passthrough_kwargs,
             )
             return response
         except Exception as e:
-            self._record_error(prompt, e)
             # for break pointing
             if isinstance(e, Timeout):
                 raise LLMTimeoutError(e)
@@ -436,7 +430,7 @@ class LitellmLLM(LLM):
         structured_response_format: dict | None = None,
         timeout_override: int | None = None,
         max_tokens: int | None = None,
-        reasoning_effort: ReasoningEffort | None = None,
+        reasoning_effort: ReasoningEffort = ReasoningEffort.AUTO,
         user_identity: LLMUserIdentity | None = None,
     ) -> ModelResponse:
         from litellm import ModelResponse as LiteLLMModelResponse
@@ -475,33 +469,50 @@ class LitellmLLM(LLM):
         structured_response_format: dict | None = None,
         timeout_override: int | None = None,
         max_tokens: int | None = None,
-        reasoning_effort: ReasoningEffort | None = None,
+        reasoning_effort: ReasoningEffort = ReasoningEffort.AUTO,
         user_identity: LLMUserIdentity | None = None,
     ) -> Iterator[ModelResponseStream]:
         from litellm import CustomStreamWrapper as LiteLLMCustomStreamWrapper
+        from litellm import HTTPHandler
         from onyx.llm.model_response import from_litellm_model_response_stream
 
-        response = cast(
-            LiteLLMCustomStreamWrapper,
-            self._completion(
-                prompt=prompt,
-                tools=tools,
-                tool_choice=tool_choice,
-                stream=True,
-                structured_response_format=structured_response_format,
-                timeout_override=timeout_override,
-                max_tokens=max_tokens,
-                parallel_tool_calls=True,
-                reasoning_effort=reasoning_effort,
-                user_identity=user_identity,
-            ),
-        )
+        # Create an isolated HTTP handler for this streaming request to avoid
+        # "Bad file descriptor" errors from connection pool conflicts when
+        # multiple threads stream concurrently (e.g., during deep research).
+        # Must use litellm's HTTPHandler wrapper, not raw httpx.Client, as
+        # litellm's response_api_handler checks for this specific type.
+        #
+        # Note: If callers abandon this generator without fully consuming it,
+        # client.close() in the finally block won't run until GC. This is
+        # acceptable because CPython's refcounting typically finalizes the
+        # generator promptly when it goes out of scope, and httpx connections
+        # have their own timeouts as a fallback.
+        client = HTTPHandler()
+        try:
+            response = cast(
+                LiteLLMCustomStreamWrapper,
+                self._completion(
+                    prompt=prompt,
+                    tools=tools,
+                    tool_choice=tool_choice,
+                    stream=True,
+                    structured_response_format=structured_response_format,
+                    timeout_override=timeout_override,
+                    max_tokens=max_tokens,
+                    parallel_tool_calls=True,
+                    reasoning_effort=reasoning_effort,
+                    user_identity=user_identity,
+                    client=client,
+                ),
+            )
 
-        for chunk in response:
-            model_response = from_litellm_model_response_stream(chunk)
+            for chunk in response:
+                model_response = from_litellm_model_response_stream(chunk)
 
-            # Track LLM cost when usage info is available (typically in the last chunk)
-            if model_response.usage:
-                self._track_llm_cost(model_response.usage)
+                # Track LLM cost when usage info is available (typically in the last chunk)
+                if model_response.usage:
+                    self._track_llm_cost(model_response.usage)
 
-            yield model_response
+                yield model_response
+        finally:
+            client.close()

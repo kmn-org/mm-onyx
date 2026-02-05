@@ -1,3 +1,21 @@
+"""Billing API endpoints for cloud multi-tenant deployments.
+
+DEPRECATED: These /tenants/* billing endpoints are being replaced by /admin/billing/*
+which provides a unified API for both self-hosted and cloud deployments.
+
+TODO(ENG-3533): Migrate frontend to use /admin/billing/* endpoints and remove this file.
+https://linear.app/onyx-app/issue/ENG-3533/migrate-tenantsbilling-adminbilling
+
+Current endpoints to migrate:
+- GET  /tenants/billing-information     -> GET  /admin/billing/information
+- POST /tenants/create-customer-portal-session -> POST /admin/billing/portal-session
+- POST /tenants/create-subscription-session    -> POST /admin/billing/checkout-session
+- GET  /tenants/stripe-publishable-key  -> (keep as-is, shared endpoint)
+
+Note: /tenants/product-gating/* endpoints are control-plane-to-data-plane calls
+and are NOT part of this migration - they stay here.
+"""
+
 import asyncio
 
 import httpx
@@ -11,6 +29,7 @@ from ee.onyx.server.tenants.billing import fetch_billing_information
 from ee.onyx.server.tenants.billing import fetch_customer_portal_session
 from ee.onyx.server.tenants.billing import fetch_stripe_checkout_session
 from ee.onyx.server.tenants.models import BillingInformation
+from ee.onyx.server.tenants.models import CreateCheckoutSessionRequest
 from ee.onyx.server.tenants.models import CreateSubscriptionSessionRequest
 from ee.onyx.server.tenants.models import ProductGatingFullSyncRequest
 from ee.onyx.server.tenants.models import ProductGatingRequest
@@ -90,19 +109,33 @@ async def billing_information(
 async def create_customer_portal_session(
     _: User = Depends(current_admin_user),
 ) -> dict:
-    """
-    Create a Stripe customer portal session via the control plane.
-    NOTE: This is currently only used for multi-tenant (cloud) deployments.
-    Self-hosted proxy endpoints will be added in a future phase.
-    """
+    """Create a Stripe customer portal session via the control plane."""
     tenant_id = get_current_tenant_id()
     return_url = f"{WEB_DOMAIN}/admin/billing"
 
     try:
         portal_url = fetch_customer_portal_session(tenant_id, return_url)
-        return {"url": portal_url}
+        return {"stripe_customer_portal_url": portal_url}
     except Exception as e:
         logger.exception("Failed to create customer portal session")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/create-checkout-session")
+async def create_checkout_session(
+    request: CreateCheckoutSessionRequest | None = None,
+    _: User = Depends(current_admin_user),
+) -> dict:
+    """Create a Stripe checkout session via the control plane."""
+    tenant_id = get_current_tenant_id()
+    billing_period = request.billing_period if request else "monthly"
+    seats = request.seats if request else None
+
+    try:
+        checkout_url = fetch_stripe_checkout_session(tenant_id, billing_period, seats)
+        return {"stripe_checkout_url": checkout_url}
+    except Exception as e:
+        logger.exception("Failed to create checkout session")
         raise HTTPException(status_code=500, detail=str(e))
 
 

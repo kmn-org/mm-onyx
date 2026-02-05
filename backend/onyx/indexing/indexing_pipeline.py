@@ -29,6 +29,7 @@ from onyx.connectors.models import TextSection
 from onyx.db.document import get_documents_by_ids
 from onyx.db.document import upsert_document_by_connector_credential_pair
 from onyx.db.document import upsert_documents
+from onyx.db.hierarchy import link_hierarchy_nodes_to_documents
 from onyx.db.models import Document as DBDocument
 from onyx.db.models import IndexModelStatus
 from onyx.db.search_settings import get_active_search_settings
@@ -120,6 +121,8 @@ def _upsert_documents_in_db(
             from_ingestion_api=doc.from_ingestion_api,
             external_access=doc.external_access,
             doc_metadata=doc.doc_metadata,
+            # parent_hierarchy_node_id is resolved in docfetching using Redis cache
+            parent_hierarchy_node_id=doc.parent_hierarchy_node_id,
         )
         document_metadata_list.append(db_doc_metadata)
 
@@ -269,6 +272,17 @@ def index_doc_batch_prepare(
         index_attempt_metadata.credential_id,
         document_ids,
     )
+
+    # Link hierarchy nodes to documents for sources where pages can be both
+    # hierarchy nodes AND documents (e.g., Notion, Confluence).
+    # This must happen after documents are upserted due to FK constraint.
+    if documents:
+        link_hierarchy_nodes_to_documents(
+            db_session=db_session,
+            document_ids=document_ids,
+            source=documents[0].source,
+            commit=False,  # We'll commit with the rest of the transaction
+        )
 
     # No docs to process because the batch is empty or every doc was already indexed
     if not updatable_docs:
@@ -493,9 +507,10 @@ def add_document_summaries(
     # Note: For document summarization, there's no cacheable prefix since the document changes
     # So we just pass the full prompt without caching
     summary_prompt = DOCUMENT_SUMMARY_PROMPT.format(document=doc_content)
-    doc_summary = llm_response_to_string(
-        llm.invoke(UserMessage(content=summary_prompt), max_tokens=MAX_CONTEXT_TOKENS)
-    )
+    prompt_msg = UserMessage(content=summary_prompt)
+
+    response = llm.invoke(prompt_msg, max_tokens=MAX_CONTEXT_TOKENS)
+    doc_summary = llm_response_to_string(response)
 
     for chunk in chunks_by_doc:
         chunk.doc_summary = doc_summary
@@ -534,14 +549,11 @@ def add_chunk_summaries(
     if not doc_info:
         # This happens if the document is too long AND document summaries are turned off
         # In this case we compute a doc summary using the LLM
-        doc_info = llm_response_to_string(
-            llm.invoke(
-                UserMessage(
-                    content=DOCUMENT_SUMMARY_PROMPT.format(document=doc_content)
-                ),
-                max_tokens=MAX_CONTEXT_TOKENS,
-            )
+        fallback_prompt = UserMessage(
+            content=DOCUMENT_SUMMARY_PROMPT.format(document=doc_content)
         )
+        response = llm.invoke(fallback_prompt, max_tokens=MAX_CONTEXT_TOKENS)
+        doc_info = llm_response_to_string(response)
 
     from onyx.llm.prompt_cache.processor import process_with_prompt_cache
 
@@ -559,12 +571,8 @@ def add_chunk_summaries(
                 continuation=True,  # Append chunk to the document context
             )
 
-            chunk.chunk_context = llm_response_to_string(
-                llm.invoke(
-                    processed_prompt,
-                    max_tokens=MAX_CONTEXT_TOKENS,
-                )
-            )
+            response = llm.invoke(processed_prompt, max_tokens=MAX_CONTEXT_TOKENS)
+            chunk.chunk_context = llm_response_to_string(response)
 
         except LLMRateLimitError as e:
             # Erroring during chunker is undesirable, so we log the error and continue

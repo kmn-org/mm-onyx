@@ -39,6 +39,13 @@ export interface Settings {
 
   // Default Assistant settings
   disable_default_assistant?: boolean;
+
+  // Onyx Craft (Build Mode) feature flag
+  onyx_craft_enabled?: boolean;
+
+  // Enterprise features flag - controlled by license enforcement at runtime
+  // True when user has a valid license, False for community edition
+  ee_features_enabled?: boolean;
 }
 
 export enum NotificationType {
@@ -47,6 +54,7 @@ export enum NotificationType {
   TRIAL_ENDS_TWO_DAYS = "two_day_trial_ending",
   ASSISTANT_FILES_READY = "assistant_files_ready",
   RELEASE_NOTES = "release_notes",
+  FEATURE_ANNOUNCEMENT = "feature_announcement",
 }
 
 export interface Notification {

@@ -77,6 +77,7 @@ const useModalContext = () => {
 const widthClasses = {
   lg: "w-[80dvw]",
   md: "w-[60rem]",
+  "md-sm": "w-[40rem]",
   sm: "w-[32rem]",
 };
 
@@ -120,6 +121,10 @@ interface ModalContentProps
   height?: keyof typeof heightClasses;
   preventAccidentalClose?: boolean;
   skipOverlay?: boolean;
+  background?: "default" | "gray";
+  /** Content rendered below the modal card, floating with gap-4 (1rem) separation.
+   *  Stays inside DialogPrimitive.Content for proper focus management. */
+  bottomSlot?: React.ReactNode;
 }
 const ModalContent = React.forwardRef<
   React.ComponentRef<typeof DialogPrimitive.Content>,
@@ -132,6 +137,8 @@ const ModalContent = React.forwardRef<
       height = "fit",
       preventAccidentalClose = true,
       skipOverlay = false,
+      background = "default",
+      bottomSlot,
       ...props
     },
     ref
@@ -246,6 +253,47 @@ const ModalContent = React.forwardRef<
       [preventAccidentalClose, hasModifiedInputs, hasAttemptedClose]
     );
 
+    const handleRef = (node: HTMLDivElement | null) => {
+      // Handle forwarded ref
+      if (typeof ref === "function") {
+        ref(node);
+      } else if (ref) {
+        ref.current = node;
+      }
+      // Handle content ref with event listener
+      contentRef(node);
+    };
+
+    const animationClasses = cn(
+      "data-[state=open]:fade-in-0 data-[state=closed]:fade-out-0",
+      "data-[state=open]:zoom-in-95 data-[state=closed]:zoom-out-95",
+      "data-[state=open]:slide-in-from-top-1/2 data-[state=closed]:slide-out-to-top-1/2",
+      "duration-200"
+    );
+
+    const dialogEventHandlers = {
+      onOpenAutoFocus: (e: Event) => {
+        resetState();
+        props.onOpenAutoFocus?.(e);
+      },
+      onCloseAutoFocus: (e: Event) => {
+        resetState();
+        props.onCloseAutoFocus?.(e);
+      },
+      onEscapeKeyDown: handleInteractOutside,
+      onPointerDownOutside: handleInteractOutside,
+      ...(!hasDescription && { "aria-describedby": undefined }),
+      ...props,
+    };
+
+    const cardClasses = cn(
+      "overflow-hidden",
+      background === "gray" ? "bg-background-tint-01" : "bg-background-tint-00",
+      "border rounded-16 shadow-2xl",
+      "flex flex-col",
+      heightClasses[height]
+    );
+
     return (
       <ModalContext.Provider
         value={{
@@ -259,49 +307,51 @@ const ModalContent = React.forwardRef<
       >
         <DialogPrimitive.Portal>
           {!skipOverlay && <ModalOverlay />}
-          <DialogPrimitive.Content
-            ref={(node) => {
-              // Handle forwarded ref
-              if (typeof ref === "function") {
-                ref(node);
-              } else if (ref) {
-                ref.current = node;
-              }
-              // Handle content ref with event listener
-              contentRef(node);
-            }}
-            className={cn(
-              "fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 overflow-hidden",
-              "z-modal",
-              "bg-background-tint-00 border rounded-16 shadow-2xl",
-              "flex flex-col",
-              // Never exceed viewport on small screens
-              "max-w-[calc(100dvw-2rem)] max-h-[calc(100dvh-2rem)]",
-              "data-[state=open]:fade-in-0 data-[state=closed]:fade-out-0",
-              "data-[state=open]:zoom-in-95 data-[state=closed]:zoom-out-95",
-              "data-[state=open]:slide-in-from-top-1/2 data-[state=closed]:slide-out-to-top-1/2",
-              "duration-200",
-              // Size classes
-              widthClasses[width],
-              heightClasses[height]
-            )}
-            onOpenAutoFocus={(e) => {
-              // Reset typing detection when modal opens
-              resetState();
-              props.onOpenAutoFocus?.(e);
-            }}
-            onCloseAutoFocus={(e) => {
-              // Reset typing detection when modal closes
-              resetState();
-              props.onCloseAutoFocus?.(e);
-            }}
-            onEscapeKeyDown={handleInteractOutside}
-            onPointerDownOutside={handleInteractOutside}
-            {...(!hasDescription && { "aria-describedby": undefined })}
-            {...props}
-          >
-            {children}
-          </DialogPrimitive.Content>
+          {bottomSlot ? (
+            // With bottomSlot: use asChild to wrap card + slot in a flex column
+            <DialogPrimitive.Content
+              asChild
+              ref={handleRef}
+              {...dialogEventHandlers}
+            >
+              <div
+                className={cn(
+                  "fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2",
+                  "z-modal",
+                  "flex flex-col gap-4 items-center",
+                  "max-w-[calc(100dvw-2rem)] max-h-[calc(100dvh-2rem)]",
+                  animationClasses,
+                  widthClasses[width]
+                )}
+              >
+                <div className={cn(cardClasses, "w-full min-h-0")}>
+                  {children}
+                </div>
+                <div className="w-full flex-shrink-0">{bottomSlot}</div>
+              </div>
+            </DialogPrimitive.Content>
+          ) : (
+            // Without bottomSlot: original single-element rendering
+            <DialogPrimitive.Content
+              ref={handleRef}
+              className={cn(
+                "fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 overflow-hidden",
+                "z-modal",
+                background === "gray"
+                  ? "bg-background-tint-01"
+                  : "bg-background-tint-00",
+                "border rounded-16 shadow-2xl",
+                "flex flex-col",
+                "max-w-[calc(100dvw-2rem)] max-h-[calc(100dvh-2rem)]",
+                animationClasses,
+                widthClasses[width],
+                heightClasses[height]
+              )}
+              {...dialogEventHandlers}
+            >
+              {children}
+            </DialogPrimitive.Content>
+          )}
         </DialogPrimitive.Portal>
       </ModalContext.Provider>
     );
@@ -344,15 +394,23 @@ const ModalHeader = React.forwardRef<HTMLDivElement, ModalHeaderProps>(
     }, [description, setHasDescription]);
 
     return (
-      <Section ref={ref} padding={1} alignItems="start" {...props}>
-        <Section gap={0.25} alignItems="start">
+      <Section ref={ref} padding={1} alignItems="start" height="fit" {...props}>
+        <Section gap={0.5}>
           <Section
             gap={0}
             padding={0}
             flexDirection="row"
             justifyContent="between"
           >
-            <Icon className="w-[1.5rem] h-[1.5rem] stroke-text-04" />
+            {/*
+              The `h-[1.5rem]` and `w-[1.5rem]` were added as backups here.
+              However, prop-resolution technically resolves to choosing classNames over size props, so technically the `size={24}` is the backup.
+              We specify both to be safe.
+
+              # Note
+              1.5rem === 24px
+            */}
+            <Icon className="stroke-text-04 h-[1.5rem] w-[1.5rem]" size={24} />
             {onClose && (
               <div
                 tabIndex={-1}
@@ -364,16 +422,19 @@ const ModalHeader = React.forwardRef<HTMLDivElement, ModalHeaderProps>(
               </div>
             )}
           </Section>
-          <DialogPrimitive.Title asChild>
-            <Text headingH3>{title}</Text>
-          </DialogPrimitive.Title>
-          {description && (
-            <DialogPrimitive.Description asChild>
-              <Text secondaryBody text03>
-                {description}
-              </Text>
-            </DialogPrimitive.Description>
-          )}
+
+          <Section alignItems="start" gap={0}>
+            <DialogPrimitive.Title asChild>
+              <Text headingH3>{title}</Text>
+            </DialogPrimitive.Title>
+            {description && (
+              <DialogPrimitive.Description asChild>
+                <Text secondaryBody text03>
+                  {description}
+                </Text>
+              </DialogPrimitive.Description>
+            )}
+          </Section>
         </Section>
         {children}
       </Section>
@@ -404,7 +465,7 @@ const ModalBody = React.forwardRef<HTMLDivElement, ModalBodyProps>(
         ref={ref}
         className={cn(
           twoTone && "bg-background-tint-01",
-          "min-h-0 overflow-y-auto"
+          "h-full min-h-0 overflow-y-auto w-full"
         )}
       >
         <Section padding={1} gap={1} alignItems="start" {...props}>
@@ -441,6 +502,7 @@ const ModalFooter = React.forwardRef<
       justifyContent="end"
       gap={0.5}
       padding={1}
+      height="fit"
       {...props}
     />
   );

@@ -13,7 +13,6 @@ from onyx.configs.constants import MessageType
 from onyx.configs.constants import SessionType
 from onyx.context.search.models import BaseFilters
 from onyx.context.search.models import ChunkContext
-from onyx.context.search.models import RerankingDetails
 from onyx.context.search.models import SavedSearchDoc
 from onyx.context.search.models import SearchDoc
 from onyx.context.search.models import Tag
@@ -182,8 +181,6 @@ class CreateChatMessageRequest(ChunkContext):
     # If search_doc_ids provided, it should use those docs explicitly
     search_doc_ids: list[int] | None
     retrieval_options: RetrievalDetails | None
-    # Useable via the APIs but not recommended for most flows
-    rerank_settings: RerankingDetails | None = None
     # allows the caller to specify the exact search query they want to use
     # will disable Query Rewording if specified
     query_override: str | None = None
@@ -313,6 +310,7 @@ class ChatMessageDetail(BaseModel):
     files: list[FileDescriptor]
     error: str | None = None
     current_feedback: str | None = None  # "like" | "dislike" | null
+    processing_duration_seconds: float | None = None
 
     def model_dump(self, *args: list, **kwargs: dict[str, Any]) -> dict[str, Any]:  # type: ignore
         initial_dict = super().model_dump(mode="json", *args, **kwargs)  # type: ignore

@@ -1,15 +1,15 @@
 "use client";
 
 import { useMemo, useState, useRef, useEffect } from "react";
-import AgentCard from "@/refresh-components/AgentCard";
-import { useUser } from "@/components/user/UserProvider";
+import AgentCard from "@/sections/cards/AgentCard";
+import { useUser } from "@/providers/UserProvider";
 import { checkUserOwnsAssistant as checkUserOwnsAgent } from "@/lib/agents";
 import { useAgents } from "@/hooks/useAgents";
 import { MinimalPersonaSnapshot } from "@/app/admin/assistants/interfaces";
 import Text from "@/refresh-components/texts/Text";
 import InputTypeIn from "@/refresh-components/inputs/InputTypeIn";
 import * as SettingsLayouts from "@/layouts/settings-layouts";
-import CounterSeparator from "@/refresh-components/CounterSeparator";
+import TextSeparator from "@/refresh-components/TextSeparator";
 import Tabs from "@/refresh-components/Tabs";
 import FilterButton from "@/refresh-components/buttons/FilterButton";
 import Popover, { PopoverMenu } from "@/refresh-components/Popover";
@@ -22,7 +22,7 @@ import {
   OPEN_URL_TOOL_NAME,
   WEB_SEARCH_TOOL_ID,
   SYSTEM_TOOL_ICONS,
-} from "@/app/chat/components/tools/constants";
+} from "@/app/app/components/tools/constants";
 import {
   SvgActions,
   SvgCheck,
@@ -429,7 +429,7 @@ export default function AgentsNavigationPage() {
         description="Customize AI behavior and knowledge for you and your team’s use cases."
         rightChildren={
           <div data-testid="AgentsPage/new-agent-button">
-            <Button href="/chat/agents/create" leftIcon={SvgPlus}>
+            <Button href="/app/agents/create" leftIcon={SvgPlus}>
               New Agent
             </Button>
           </div>
@@ -660,7 +660,7 @@ export default function AgentsNavigationPage() {
               agents={featuredAgents}
             />
             <AgentsSection title="All Agents" agents={allAgents} />
-            <CounterSeparator
+            <TextSeparator
               count={agentCount}
               text={agentCount === 1 ? "Agent" : "Agents"}
             />

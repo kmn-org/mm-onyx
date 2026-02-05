@@ -4,6 +4,7 @@ An overview can be found in the README.md file in this directory.
 """
 
 import re
+import time
 import traceback
 from collections.abc import Callable
 from uuid import UUID
@@ -20,12 +21,17 @@ from onyx.chat.chat_utils import create_chat_session_from_request
 from onyx.chat.chat_utils import get_custom_agent_prompt
 from onyx.chat.chat_utils import is_last_assistant_message_clarification
 from onyx.chat.chat_utils import load_all_chat_files
+from onyx.chat.compression import calculate_total_history_tokens
+from onyx.chat.compression import compress_chat_history
+from onyx.chat.compression import find_summary_for_branch
+from onyx.chat.compression import get_compression_params
 from onyx.chat.emitter import get_default_emitter
 from onyx.chat.llm_loop import run_llm_loop
 from onyx.chat.models import AnswerStream
 from onyx.chat.models import ChatBasicResponse
 from onyx.chat.models import ChatFullResponse
 from onyx.chat.models import ChatLoadedFile
+from onyx.chat.models import ChatMessageSimple
 from onyx.chat.models import CreateChatSessionID
 from onyx.chat.models import ExtractedProjectFiles
 from onyx.chat.models import MessageResponseIDInfo
@@ -42,7 +48,6 @@ from onyx.configs.constants import DocumentSource
 from onyx.configs.constants import MessageType
 from onyx.configs.constants import MilestoneRecordType
 from onyx.context.search.models import BaseFilters
-from onyx.context.search.models import CitationDocInfo
 from onyx.context.search.models import SearchDoc
 from onyx.db.chat import create_new_chat_message
 from onyx.db.chat import get_chat_session_by_id
@@ -83,7 +88,6 @@ from onyx.tools.tool_constructor import construct_tools
 from onyx.tools.tool_constructor import CustomToolConfig
 from onyx.tools.tool_constructor import SearchToolConfig
 from onyx.utils.logger import setup_logger
-from onyx.utils.long_term_log import LongTermLogger
 from onyx.utils.telemetry import mt_cloud_telemetry
 from onyx.utils.timing import log_function_time
 from onyx.utils.variable_functionality import (
@@ -294,7 +298,7 @@ def _get_project_search_availability(
 
 def handle_stream_message_objects(
     new_msg_req: SendMessageRequest,
-    user: User | None,
+    user: User,
     db_session: Session,
     # if specified, uses the last user message and does not create a new user message based
     # on the `new_msg_req.message`. Currently, requires a state where the last message is a
@@ -313,17 +317,17 @@ def handle_stream_message_objects(
     external_state_container: ChatStateContainer | None = None,
 ) -> AnswerStream:
     tenant_id = get_current_tenant_id()
+    processing_start_time = time.monotonic()
 
     llm: LLM | None = None
     chat_session: ChatSession | None = None
     redis_client: Redis | None = None
 
-    user_id = user.id if user is not None else None
-    llm_user_identifier = (
-        user.email
-        if user is not None and getattr(user, "email", None)
-        else (str(user_id) if user_id else "anonymous_user")
-    )
+    user_id = user.id
+    if user.is_anonymous:
+        llm_user_identifier = "anonymous_user"
+    else:
+        llm_user_identifier = user.email or str(user_id)
     try:
         if not new_msg_req.chat_session_id:
             if not new_msg_req.chat_session_info:
@@ -350,15 +354,10 @@ def handle_stream_message_objects(
             user_id=llm_user_identifier, session_id=str(chat_session.id)
         )
 
-        # permanent "log" store, used primarily for debugging
-        long_term_logger = LongTermLogger(
-            metadata={"user_id": str(user_id), "chat_session_id": str(chat_session.id)}
-        )
-
         # Milestone tracking, most devs using the API don't need to understand this
         mt_cloud_telemetry(
             tenant_id=tenant_id,
-            distinct_id=user.email if user else tenant_id,
+            distinct_id=user.email if not user.is_anonymous else tenant_id,
             event=MilestoneRecordType.MULTIPLE_ASSISTANTS,
         )
 
@@ -368,7 +367,7 @@ def handle_stream_message_objects(
             attribute="event_telemetry",
             fallback=noop_fallback,
         )(
-            distinct_id=user.email if user else tenant_id,
+            distinct_id=user.email if not user.is_anonymous else tenant_id,
             event="user_message_sent",
             properties={
                 "origin": new_msg_req.origin.value,
@@ -385,7 +384,6 @@ def handle_stream_message_objects(
             user=user,
             llm_override=new_msg_req.llm_override or chat_session.llm_override,
             additional_headers=litellm_additional_headers,
-            long_term_logger=long_term_logger,
         )
         token_counter = get_llm_token_counter(llm)
 
@@ -460,6 +458,14 @@ def handle_stream_message_objects(
             )
 
             chat_history.append(user_message)
+
+        # Find applicable summary for the current branch
+        # Summary applies if its parent_message_id is in current chat_history
+        summary_message = find_summary_for_branch(db_session, chat_history)
+        if summary_message and summary_message.last_summarized_message_id:
+            cutoff_id = summary_message.last_summarized_message_id
+            # Filter chat_history to only messages after the cutoff
+            chat_history = [m for m in chat_history if m.id > cutoff_id]
 
         memories = get_memories(user, db_session)
 
@@ -574,6 +580,15 @@ def handle_stream_message_objects(
             tool_id_to_name_map=tool_id_to_name_map,
         )
 
+        # Prepend summary message if compression exists
+        if summary_message is not None:
+            summary_simple = ChatMessageSimple(
+                message=summary_message.message,
+                token_count=summary_message.token_count,
+                message_type=MessageType.ASSISTANT,
+            )
+            simple_chat_history.insert(0, summary_simple)
+
         redis_client = get_redis_client()
 
         reset_cancel_status(
@@ -599,10 +614,12 @@ def handle_stream_message_objects(
         ) -> None:
             llm_loop_completion_handle(
                 state_container=state_container,
-                db_session=db_session,
-                chat_session_id=str(chat_session.id),
                 is_connected=check_is_connected,
+                db_session=db_session,
                 assistant_message=assistant_response,
+                llm=llm,
+                reserved_tokens=reserved_token_count,
+                processing_start_time=processing_start_time,
             )
 
         # Run the LLM loop with explicit wrapper for stop signal handling
@@ -721,9 +738,13 @@ def llm_loop_completion_handle(
     state_container: ChatStateContainer,
     is_connected: Callable[[], bool],
     db_session: Session,
-    chat_session_id: str,
     assistant_message: ChatMessage,
+    llm: LLM,
+    reserved_tokens: int,
+    processing_start_time: float | None = None,
 ) -> None:
+    chat_session_id = assistant_message.chat_session_id
+
     # Determine if stopped by user
     completed_normally = is_connected()
     # Build final answer based on completion status
@@ -744,33 +765,48 @@ def llm_loop_completion_handle(
         else:
             final_answer = "The generation was stopped by the user."
 
-    # Build citation_docs_info from accumulated citations in state container
-    citation_docs_info: list[CitationDocInfo] = []
-    seen_citation_nums: set[int] = set()
-    for citation_num, search_doc in state_container.citation_to_doc.items():
-        if citation_num not in seen_citation_nums:
-            seen_citation_nums.add(citation_num)
-            citation_docs_info.append(
-                CitationDocInfo(
-                    search_doc=search_doc,
-                    citation_number=citation_num,
-                )
-            )
-
     save_chat_turn(
         message_text=final_answer,
         reasoning_tokens=state_container.reasoning_tokens,
-        citation_docs_info=citation_docs_info,
+        citation_to_doc=state_container.citation_to_doc,
         tool_calls=state_container.tool_calls,
+        all_search_docs=state_container.get_all_search_docs(),
         db_session=db_session,
         assistant_message=assistant_message,
         is_clarification=state_container.is_clarification,
+        emitted_citations=state_container.get_emitted_citations(),
+        pre_answer_processing_time=state_container.get_pre_answer_processing_time(),
     )
+
+    # Check if compression is needed after saving the message
+    updated_chat_history = create_chat_history_chain(
+        chat_session_id=chat_session_id,
+        db_session=db_session,
+    )
+    total_tokens = calculate_total_history_tokens(updated_chat_history)
+
+    compression_params = get_compression_params(
+        max_input_tokens=llm.config.max_input_tokens,
+        current_history_tokens=total_tokens,
+        reserved_tokens=reserved_tokens,
+    )
+    if compression_params.should_compress:
+        # Build tool mapping for formatting messages
+        all_tools = get_tools(db_session)
+        tool_id_to_name = {tool.id: tool.name for tool in all_tools}
+
+        compress_chat_history(
+            db_session=db_session,
+            chat_history=updated_chat_history,
+            llm=llm,
+            compression_params=compression_params,
+            tool_id_to_name=tool_id_to_name,
+        )
 
 
 def stream_chat_message_objects(
     new_msg_req: CreateChatMessageRequest,
-    user: User | None,
+    user: User,
     db_session: Session,
     # if specified, uses the last user message and does not create a new user message based
     # on the `new_msg_req.message`. Currently, requires a state where the last message is a

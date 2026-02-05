@@ -19,6 +19,8 @@ from onyx.natural_language_processing.english_stopwords import ENGLISH_STOPWORDS
 from onyx.onyxbot.slack.models import ChannelType
 from onyx.prompts.federated_search import SLACK_DATE_EXTRACTION_PROMPT
 from onyx.prompts.federated_search import SLACK_QUERY_EXPANSION_PROMPT
+from onyx.tracing.llm_utils import llm_generation_span
+from onyx.tracing.llm_utils import record_llm_span_output
 from onyx.utils.logger import setup_logger
 
 logger = setup_logger()
@@ -192,7 +194,15 @@ def extract_date_range_from_query(
 
     try:
         prompt = SLACK_DATE_EXTRACTION_PROMPT.format(query=query)
-        response = llm_response_to_string(llm.invoke(UserMessage(content=prompt)))
+        prompt_msg = UserMessage(content=prompt)
+
+        # Call LLM with Braintrust tracing
+        with llm_generation_span(
+            llm=llm, flow="slack_date_extraction", input_messages=[prompt_msg]
+        ) as span_generation:
+            llm_response = llm.invoke(prompt_msg)
+            response = llm_response_to_string(llm_response)
+            record_llm_span_output(span_generation, response, llm_response.usage)
 
         response_clean = _parse_llm_code_block_response(response)
 
@@ -557,6 +567,23 @@ def extract_content_words_from_recency_query(
     return content_words_filtered[:MAX_CONTENT_WORDS]
 
 
+def _is_valid_keyword_query(line: str) -> bool:
+    """Check if a line looks like a valid keyword query vs explanatory text.
+
+    Returns False for lines that appear to be LLM explanations rather than keywords.
+    """
+    # Reject lines that start with parentheses (explanatory notes)
+    if line.startswith("("):
+        return False
+
+    # Reject lines that are too long (likely sentences, not keywords)
+    # Keywords should be short - reject if > 50 chars or > 6 words
+    if len(line) > 50 or len(line.split()) > 6:
+        return False
+
+    return True
+
+
 def expand_query_with_llm(query_text: str, llm: LLM) -> list[str]:
     """Use LLM to expand query into multiple search variations.
 
@@ -574,14 +601,28 @@ def expand_query_with_llm(query_text: str, llm: LLM) -> list[str]:
     )
 
     try:
-        response = llm_response_to_string(llm.invoke(prompt))
+        # Call LLM with Braintrust tracing
+        with llm_generation_span(
+            llm=llm, flow="slack_query_expansion", input_messages=[prompt]
+        ) as span_generation:
+            llm_response = llm.invoke(prompt)
+            response = llm_response_to_string(llm_response)
+            record_llm_span_output(span_generation, response, llm_response.usage)
 
         response_clean = _parse_llm_code_block_response(response)
 
         # Split into lines and filter out empty lines
-        rephrased_queries = [
+        raw_queries = [
             line.strip() for line in response_clean.split("\n") if line.strip()
         ]
+
+        # Filter out lines that look like explanatory text rather than keywords
+        rephrased_queries = [q for q in raw_queries if _is_valid_keyword_query(q)]
+
+        # Log if we filtered out garbage
+        if len(raw_queries) != len(rephrased_queries):
+            filtered_out = set(raw_queries) - set(rephrased_queries)
+            logger.warning(f"Filtered out non-keyword LLM responses: {filtered_out}")
 
         # If no queries generated, use empty query
         if not rephrased_queries:

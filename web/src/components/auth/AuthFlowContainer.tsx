@@ -35,8 +35,8 @@ export default function AuthFlowContainer({
         <div className="text-sm mt-6 text-center w-full text-white/80 dark:text-text-03 mainUiBody mx-auto">
           Already have an account?{" "}
           <Link
-            href="/auth/login"
-            className="text-white dark:text-text-05 mainUiAction underline transition-colors duration-200"
+            href="/auth/login?autoRedirectToSignup=false"
+            className="text-text-05 mainUiAction underline transition-colors duration-200"
           >
             Sign In
           </Link>

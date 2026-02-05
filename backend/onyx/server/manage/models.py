@@ -44,6 +44,9 @@ class AuthTypeResponse(BaseModel):
     requires_verification: bool
     anonymous_user_enabled: bool | None = None
     password_min_length: int
+    # whether there are any users in the system
+    has_users: bool = True
+    oauth_enabled: bool = False
 
 
 class UserSpecificAssistantPreference(BaseModel):
