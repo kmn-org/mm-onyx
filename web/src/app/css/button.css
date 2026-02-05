@@ -22,14 +22,14 @@
   color: var(--text-inverted-05) !important;
 }
 .button-main-primary:disabled .button-main-primary-text {
-  color: var(--text-inverted-04) !important;
+  color: var(--text-02) !important;
 }
 
 .button-main-primary-icon {
   stroke: var(--text-inverted-05);
 }
 .button-main-primary:disabled .button-main-primary-icon {
-  stroke: var(--text-inverted-04);
+  stroke: var(--text-02);
 }
 
 /* ============================================================================
@@ -214,14 +214,14 @@
   color: var(--text-light-05) !important;
 }
 .button-action-primary:disabled .button-action-primary-text {
-  color: var(--text-01) !important;
+  color: var(--text-02) !important;
 }
 
 .button-action-primary-icon {
   stroke: var(--text-light-05);
 }
 .button-action-primary:disabled .button-action-primary-icon {
-  stroke: var(--text-01);
+  stroke: var(--text-02);
 }
 
 /* ============================================================================
@@ -318,14 +318,14 @@
   color: var(--text-light-05) !important;
 }
 .button-danger-primary:disabled .button-danger-primary-text {
-  color: var(--text-01) !important;
+  color: var(--text-02) !important;
 }
 
 .button-danger-primary-icon {
   stroke: var(--text-light-05);
 }
 .button-danger-primary:disabled .button-danger-primary-icon {
-  stroke: var(--text-01);
+  stroke: var(--text-02);
 }
 
 /* ============================================================================

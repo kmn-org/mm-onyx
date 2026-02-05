@@ -100,6 +100,7 @@ function SettingsPopover({
               User Settings
             </LineItem>
           </div>,
+          /* Notifications - hidden for rebranding
           <LineItem
             key="notifications"
             icon={SvgBell}
@@ -109,6 +110,8 @@ function SettingsPopover({
               undismissedCount > 0 ? ` (${undismissedCount})` : ""
             }`}
           </LineItem>,
+          */
+          /* Help & FAQ - hidden for rebranding
           <LineItem
             key="help-faq"
             icon={SvgExternalLink}
@@ -122,6 +125,7 @@ function SettingsPopover({
           >
             Help & FAQ
           </LineItem>,
+          */
           null,
           showLogout && (
             <LineItem

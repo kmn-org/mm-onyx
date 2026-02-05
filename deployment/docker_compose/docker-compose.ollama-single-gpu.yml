@@ -1,0 +1,23 @@
+# Docker Compose Override for Ollama with Single GPU
+# Use this when you want to limit Ollama to use only 1 GPU
+#
+# USAGE:
+#   docker compose -f docker-compose.yml -f docker-compose.ollama-single-gpu.yml up -d
+
+name: onyx
+
+services:
+  ollama:
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1  # Use only 1 GPU
+              capabilities: [gpu]
+
+    environment:
+      - OLLAMA_NUM_PARALLEL=${OLLAMA_NUM_PARALLEL:-2}
+      - OLLAMA_MAX_LOADED_MODELS=${OLLAMA_MAX_LOADED_MODELS:-2}
+      - OLLAMA_KEEP_ALIVE=${OLLAMA_KEEP_ALIVE:-10m}
+      - OLLAMA_NUM_CTX=${OLLAMA_NUM_CTX:-4096}

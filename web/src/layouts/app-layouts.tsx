@@ -114,9 +114,9 @@ function Footer() {
 
   const customFooterContent =
     settings?.enterpriseSettings?.custom_lower_disclaimer_content ||
-    `[Onyx ${
+    `[Maticmind ${
       settings?.webVersion || "dev"
-    }](https://www.onyx.app/) - Open Source AI Platform`;
+    }](https://www.maticmind.it/) - Open Source AI Platform`;
 
   return (
     <footer className="w-full flex flex-row justify-center items-center gap-2 pb-2">

@@ -23,6 +23,71 @@
   --grey-02: #fafafa;
   --grey-00: #ffffff;
 
+  /* Brand Blue Scale (Primary: #0D2954) */
+  --brand-blue-100: #050e1c;
+  --brand-blue-98: #071528;
+  --brand-blue-96: #0a1c36;
+  --brand-blue-94: #0c2244;
+  --brand-blue-92: #0d2954;
+  --brand-blue-90: #1a3660;
+  --brand-blue-85: #2b3e62;
+  --brand-blue-80: #3d5a8a;
+  --brand-blue-70: #5f7ba8;
+  --brand-blue-60: #819cc0;
+  --brand-blue-50: #9ab3d4;
+  --brand-blue-40: #b3cae2;
+  --brand-blue-30: #cce1f0;
+  --brand-blue-20: #dde9f4;
+  --brand-blue-10: #eef4fa;
+  --brand-blue-05: #f5f8fc;
+  --brand-blue-02: #fafbfd;
+  --brand-blue-00: #ffffff;
+
+  /* Brand Teal Scale (Primary: #60B8CC) */
+  --brand-teal-100: #0a4a56;
+  --brand-teal-90: #0d5a68;
+  --brand-teal-80: #1a6b7a;
+  --brand-teal-70: #2e8494;
+  --brand-teal-60: #4299aa;
+  --brand-teal-50: #60b8cc;
+  --brand-teal-40: #7cc6d6;
+  --brand-teal-30: #90c4d4;
+  --brand-teal-20: #b4e2ea;
+  --brand-teal-10: #d0f0f4;
+  --brand-teal-05: #e8f8fa;
+  --brand-teal-02: #f4fcfd;
+
+  /* Brand Accent Scale (Vivid Teal: #20CFC0) */
+  --brand-accent-100: #0a524c;
+  --brand-accent-90: #0f6b64;
+  --brand-accent-80: #14847c;
+  --brand-accent-70: #1a9d94;
+  --brand-accent-60: #1fb6ac;
+  --brand-accent-50: #20cfc0;
+  --brand-accent-40: #4dd9cd;
+  --brand-accent-30: #79e3da;
+  --brand-accent-20: #92fcec;
+  --brand-accent-10: #b8fef4;
+  --brand-accent-05: #dcfff9;
+
+  /* Alpha Brand Blue (with opacity) */
+  --alpha-brand-blue-95: #0d2954f2;
+  --alpha-brand-blue-90: #0d2954e6;
+  --alpha-brand-blue-85: #0d2954d9;
+  --alpha-brand-blue-80: #0d2954cc;
+  --alpha-brand-blue-75: #0d2954bf;
+  --alpha-brand-blue-70: #0d2954b3;
+  --alpha-brand-blue-60: #0d295499;
+  --alpha-brand-blue-55: #0d29548c;
+  --alpha-brand-blue-50: #0d295480;
+  --alpha-brand-blue-45: #0d295473;
+  --alpha-brand-blue-40: #0d295466;
+  --alpha-brand-blue-30: #0d29544d;
+  --alpha-brand-blue-20: #0d295433;
+  --alpha-brand-blue-15: #0d295426;
+  --alpha-brand-blue-10: #0d29541a;
+  --alpha-brand-blue-05: #0d29540d;
+
   /* Alpha Grey 100 (Black with opacity) */
   --alpha-grey-100-95: #000000f2;
   --alpha-grey-100-90: #000000e5;
@@ -201,43 +266,43 @@
 
 /* Brand Colors */
 :root {
-  /* Onyx / Ink */
-  --onyx-ink-100: #000000;
-  --onyx-ink-95: #1c1c1c;
-  --onyx-ink-90: #333333;
+  /* Brand Primary (Navy Blue) */
+  --brand-primary-100: var(--brand-blue-92);
+  --brand-primary-95: var(--brand-blue-90);
+  --brand-primary-90: var(--brand-blue-85);
 
-  /* Onyx / Chrome */
-  --onyx-chrome-20: #cacaca;
-  --onyx-chrome-10: #e9e9e9;
-  --onyx-chrome-00: #ffffff;
+  /* Brand Secondary (Teal/Light) */
+  --brand-secondary-20: var(--brand-teal-20);
+  --brand-secondary-10: var(--brand-teal-10);
+  --brand-secondary-00: #ffffff;
 
-  /* Tint (referencing Stone variables) */
-  --tint-98: var(--stone-98);
-  --tint-95: var(--stone-95);
-  --tint-90: var(--stone-90);
-  --tint-85: var(--stone-85);
-  --tint-80: var(--stone-80);
-  --tint-60: var(--stone-60);
-  --tint-50: var(--stone-50);
-  --tint-40: var(--stone-40);
-  --tint-20: var(--stone-20);
-  --tint-10: var(--stone-10);
-  --tint-05: var(--stone-05);
-  --tint-02: var(--stone-02);
+  /* Tint (referencing Brand Blue for consistency) */
+  --tint-98: var(--brand-blue-100);
+  --tint-95: var(--brand-blue-98);
+  --tint-90: var(--brand-blue-96);
+  --tint-85: var(--brand-blue-94);
+  --tint-80: var(--brand-blue-92);
+  --tint-60: var(--brand-blue-85);
+  --tint-50: var(--brand-blue-70);
+  --tint-40: var(--brand-blue-60);
+  --tint-20: var(--brand-blue-40);
+  --tint-10: var(--brand-blue-20);
+  --tint-05: var(--brand-blue-10);
+  --tint-02: var(--brand-blue-05);
 }
 
 /* Light Colors */
 :root {
   /* Shimmer colors for loading animations */
-  --shimmer-base: #a3a3a3;
-  --shimmer-highlight: #000000;
+  --shimmer-base: var(--brand-blue-60);
+  --shimmer-highlight: var(--brand-blue-92);
 
   /* Text */
-  --text-05: var(--alpha-grey-100-90);
-  --text-04: var(--alpha-grey-100-75);
-  --text-03: var(--alpha-grey-100-55);
-  --text-02: var(--alpha-grey-100-45);
-  --text-01: var(--alpha-grey-100-20);
+  --text-05: var(--alpha-brand-blue-90);
+  --text-04: var(--alpha-brand-blue-75);
+  --text-03: var(--alpha-brand-blue-55);
+  --text-02: var(--alpha-brand-blue-45);
+  --text-01: var(--alpha-brand-blue-20);
   --text-inverted-01: var(--alpha-grey-00-20);
   --text-inverted-02: var(--alpha-grey-00-45);
   --text-inverted-03: var(--alpha-grey-00-60);
@@ -245,23 +310,23 @@
   --text-inverted-05: var(--alpha-grey-00-95);
   --text-light-03: var(--alpha-grey-00-60);
   --text-light-05: var(--grey-00);
-  --text-dark-03: var(--alpha-grey-100-55);
-  --text-dark-05: var(--grey-100);
+  --text-dark-03: var(--alpha-brand-blue-55);
+  --text-dark-05: var(--brand-blue-92);
 
   /* Background / Neutral */
-  --background-neutral-00: var(--grey-00);
-  --background-neutral-01: var(--grey-02);
-  --background-neutral-02: var(--grey-06);
-  --background-neutral-03: var(--grey-10);
-  --background-neutral-04: var(--grey-20);
-  --background-neutral-inverted-04: var(--grey-75);
-  --background-neutral-inverted-03: var(--grey-80);
-  --background-neutral-inverted-02: var(--grey-85);
-  --background-neutral-inverted-01: var(--grey-90);
-  --background-neutral-inverted-00: var(--grey-100);
+  --background-neutral-00: var(--brand-blue-00);
+  --background-neutral-01: var(--brand-blue-02);
+  --background-neutral-02: var(--brand-blue-05);
+  --background-neutral-03: var(--brand-blue-10);
+  --background-neutral-04: var(--brand-blue-20);
+  --background-neutral-inverted-04: var(--brand-blue-80);
+  --background-neutral-inverted-03: var(--brand-blue-85);
+  --background-neutral-inverted-02: var(--brand-blue-90);
+  --background-neutral-inverted-01: var(--brand-blue-92);
+  --background-neutral-inverted-00: var(--brand-blue-100);
   --background-neutral-light-00: var(--grey-00);
-  --background-neutral-light-03: var(--grey-10);
-  --background-neutral-dark-03: var(--grey-80);
+  --background-neutral-light-03: var(--brand-blue-10);
+  --background-neutral-dark-03: var(--brand-blue-85);
 
   /* Background / Tint */
   --background-tint-00: var(--grey-00);
@@ -273,30 +338,30 @@
   --background-tint-inverted-03: var(--tint-85);
   --background-tint-inverted-02: var(--tint-90);
   --background-tint-inverted-01: var(--tint-95);
-  --background-tint-inverted-00: var(--grey-100);
+  --background-tint-inverted-00: var(--brand-blue-100);
   --background-tint-light-01: var(--tint-02);
   --background-tint-dark-01: var(--tint-95);
 
   /* Border */
-  --border-01: var(--grey-10);
-  --border-02: var(--grey-20);
-  --border-03: var(--grey-40);
-  --border-04: var(--grey-50);
-  --border-05: var(--grey-100);
+  --border-01: var(--brand-blue-10);
+  --border-02: var(--brand-blue-20);
+  --border-03: var(--brand-blue-50);
+  --border-04: var(--brand-blue-60);
+  --border-05: var(--brand-blue-92);
   --border-inverted-05: var(--grey-00);
-  --border-inverted-04: var(--grey-30);
-  --border-inverted-03: var(--grey-50);
-  --border-inverted-02: var(--grey-60);
-  --border-inverted-01: var(--grey-80);
+  --border-inverted-04: var(--brand-blue-40);
+  --border-inverted-03: var(--brand-blue-50);
+  --border-inverted-02: var(--brand-blue-60);
+  --border-inverted-01: var(--brand-blue-80);
 
   /* Theme */
-  --theme-primary-06: var(--onyx-ink-100);
-  --theme-primary-05: var(--onyx-ink-95);
-  --theme-primary-04: var(--onyx-ink-90);
+  --theme-primary-06: var(--brand-blue-92);
+  --theme-primary-05: var(--brand-blue-90);
+  --theme-primary-04: var(--brand-blue-85);
 
   /* Theme / Gradient */
-  --theme-gradient-05: var(--tint-50);
-  --theme-gradient-00: var(--grey-00);
+  --theme-gradient-05: var(--brand-blue-92);
+  --theme-gradient-00: var(--brand-teal-50);
 
   /* Theme / Red */
   --theme-red-05: var(--red-50);
@@ -381,13 +446,13 @@
   --status-text-error-05: var(--red-50);
 
   /* Action */
-  --action-link-06: var(--blue-60);
-  --action-link-05: var(--blue-50);
-  --action-link-04: var(--blue-40);
-  --action-link-03: var(--blue-20);
-  --action-link-02: var(--blue-10);
-  --action-link-01: var(--blue-05);
-  --action-link-00: var(--blue-01);
+  --action-link-06: var(--brand-teal-70);
+  --action-link-05: var(--brand-teal-50);
+  --action-link-04: var(--brand-teal-40);
+  --action-link-03: var(--brand-teal-20);
+  --action-link-02: var(--brand-teal-10);
+  --action-link-01: var(--brand-teal-05);
+  --action-link-00: var(--brand-teal-02);
   --action-danger-06: var(--red-60);
   --action-danger-05: var(--red-50);
   --action-danger-04: var(--red-40);
@@ -396,7 +461,7 @@
   --action-danger-01: var(--red-05);
 
   /* Action / Text */
-  --action-text-link-05: var(--blue-50);
+  --action-text-link-05: var(--brand-teal-60);
   --action-text-danger-05: var(--red-50);
 
   /* Code */
@@ -422,13 +487,18 @@
   --mask-01: var(--alpha-grey-100-10);
   --mask-02: var(--alpha-grey-100-20);
   --mask-03: var(--alpha-grey-100-40);
+
+  /* Logo Colors */
+  --logo-text: var(--brand-blue-92);
+  --logo-accent: var(--brand-teal-30);
+  --logo-pictogram: var(--brand-teal-30);
 }
 
 /* Dark Colors */
 .dark {
   /* Shimmer colors for loading animations */
-  --shimmer-base: #5c5c5c;
-  --shimmer-highlight: #ffffff;
+  --shimmer-base: var(--brand-blue-70);
+  --shimmer-highlight: var(--brand-teal-40);
 
   /* Text */
   --text-05: var(--alpha-grey-00-95);
@@ -436,33 +506,33 @@
   --text-03: var(--alpha-grey-00-60);
   --text-02: var(--alpha-grey-00-45);
   --text-01: var(--alpha-grey-00-20);
-  --text-inverted-01: var(--alpha-grey-100-20);
-  --text-inverted-02: var(--alpha-grey-100-45);
-  --text-inverted-03: var(--alpha-grey-100-55);
-  --text-inverted-04: var(--alpha-grey-100-75);
-  --text-inverted-05: var(--alpha-grey-100-90);
+  --text-inverted-01: var(--alpha-brand-blue-20);
+  --text-inverted-02: var(--alpha-brand-blue-45);
+  --text-inverted-03: var(--alpha-brand-blue-55);
+  --text-inverted-04: var(--alpha-brand-blue-75);
+  --text-inverted-05: var(--alpha-brand-blue-90);
   --text-light-03: var(--alpha-grey-00-60);
   --text-light-05: var(--grey-00);
-  --text-dark-03: var(--alpha-grey-100-55);
-  --text-dark-05: var(--grey-100);
+  --text-dark-03: var(--alpha-brand-blue-55);
+  --text-dark-05: var(--brand-blue-92);
 
   /* Background / Neutral */
-  --background-neutral-00: var(--grey-100);
-  --background-neutral-01: var(--grey-90);
-  --background-neutral-02: var(--grey-85);
-  --background-neutral-03: var(--grey-80);
-  --background-neutral-04: var(--grey-75);
-  --background-neutral-inverted-04: var(--grey-20);
-  --background-neutral-inverted-03: var(--grey-10);
-  --background-neutral-inverted-02: var(--grey-06);
-  --background-neutral-inverted-01: var(--grey-02);
+  --background-neutral-00: var(--brand-blue-100);
+  --background-neutral-01: var(--brand-blue-98);
+  --background-neutral-02: var(--brand-blue-96);
+  --background-neutral-03: var(--brand-blue-94);
+  --background-neutral-04: var(--brand-blue-92);
+  --background-neutral-inverted-04: var(--brand-blue-20);
+  --background-neutral-inverted-03: var(--brand-blue-10);
+  --background-neutral-inverted-02: var(--brand-blue-05);
+  --background-neutral-inverted-01: var(--brand-blue-02);
   --background-neutral-inverted-00: var(--grey-00);
   --background-neutral-light-00: var(--grey-00);
-  --background-neutral-light-03: var(--grey-10);
-  --background-neutral-dark-03: var(--grey-80);
+  --background-neutral-light-03: var(--brand-blue-10);
+  --background-neutral-dark-03: var(--brand-blue-94);
 
   /* Background / Tint */
-  --background-tint-00: var(--grey-100);
+  --background-tint-00: var(--brand-blue-100);
   --background-tint-01: var(--tint-95);
   --background-tint-02: var(--tint-90);
   --background-tint-03: var(--tint-85);
@@ -476,25 +546,25 @@
   --background-tint-dark-01: var(--tint-95);
 
   /* Border */
-  --border-01: var(--grey-80);
-  --border-02: var(--grey-60);
-  --border-03: var(--grey-50);
-  --border-04: var(--grey-30);
+  --border-01: var(--brand-blue-94);
+  --border-02: var(--brand-blue-85);
+  --border-03: var(--brand-blue-70);
+  --border-04: var(--brand-blue-50);
   --border-05: var(--grey-00);
-  --border-inverted-05: var(--grey-100);
-  --border-inverted-04: var(--grey-50);
-  --border-inverted-03: var(--grey-40);
-  --border-inverted-02: var(--grey-20);
-  --border-inverted-01: var(--grey-10);
+  --border-inverted-05: var(--brand-blue-92);
+  --border-inverted-04: var(--brand-blue-70);
+  --border-inverted-03: var(--brand-blue-60);
+  --border-inverted-02: var(--brand-blue-40);
+  --border-inverted-01: var(--brand-blue-20);
 
   /* Theme */
-  --theme-primary-06: var(--onyx-chrome-00);
-  --theme-primary-05: var(--onyx-chrome-10);
-  --theme-primary-04: var(--onyx-chrome-20);
+  --theme-primary-06: var(--brand-teal-50);
+  --theme-primary-05: var(--brand-teal-40);
+  --theme-primary-04: var(--brand-teal-30);
 
   /* Theme / Gradient */
-  --theme-gradient-05: var(--grey-100);
-  --theme-gradient-00: var(--grey-00);
+  --theme-gradient-05: var(--brand-blue-92);
+  --theme-gradient-00: var(--brand-teal-50);
 
   /* Theme / Red */
   --theme-red-05: var(--red-45);
@@ -579,13 +649,13 @@
   --status-text-error-05: var(--red-45);
 
   /* Action */
-  --action-link-06: var(--blue-40);
-  --action-link-05: var(--blue-50);
-  --action-link-04: var(--blue-60);
-  --action-link-03: var(--blue-80);
-  --action-link-02: var(--blue-85);
-  --action-link-01: var(--blue-90);
-  --action-link-00: var(--blue-95);
+  --action-link-06: var(--brand-accent-40);
+  --action-link-05: var(--brand-accent-50);
+  --action-link-04: var(--brand-accent-60);
+  --action-link-03: var(--brand-accent-80);
+  --action-link-02: var(--brand-accent-90);
+  --action-link-01: var(--brand-accent-100);
+  --action-link-00: var(--brand-accent-100);
   --action-danger-06: var(--red-40);
   --action-danger-05: var(--red-50);
   --action-danger-04: var(--red-60);
@@ -594,7 +664,7 @@
   --action-danger-01: var(--red-90);
 
   /* Action / Text */
-  --action-text-link-05: var(--blue-45);
+  --action-text-link-05: var(--brand-accent-40);
   --action-text-danger-05: var(--red-45);
 
   /* Code */
@@ -620,4 +690,9 @@
   --mask-01: var(--alpha-grey-100-10);
   --mask-02: var(--alpha-grey-100-20);
   --mask-03: var(--alpha-grey-100-40);
+
+  /* Logo Colors */
+  --logo-text: var(--brand-teal-50);
+  --logo-accent: var(--grey-00);
+  --logo-pictogram: var(--brand-teal-50);
 }

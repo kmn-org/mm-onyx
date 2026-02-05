@@ -78,7 +78,7 @@ function SummaryRow({
   return (
     <TableRow
       onClick={onToggle}
-      className="border-border dark:hover:bg-neutral-800 dark:border-neutral-700 group hover:bg-background-settings-hover/20 bg-background-sidebar py-4 rounded-sm !border cursor-pointer"
+      className="border-border group hover:bg-background-tint-02 bg-background-tint-01 py-4 rounded-sm !border cursor-pointer"
     >
       <TableCell>
         <div className="text-xl flex items-center truncate ellipsis gap-x-2 font-semibold">
@@ -95,14 +95,14 @@ function SummaryRow({
       </TableCell>
 
       <TableCell>
-        <div className="text-sm text-neutral-500 dark:text-neutral-300">
+        <div className="text-sm text-text-02">
           Total Connectors
         </div>
         <div className="text-xl font-semibold">{summary.total_connectors}</div>
       </TableCell>
 
       <TableCell>
-        <div className="text-sm text-neutral-500 dark:text-neutral-300">
+        <div className="text-sm text-text-02">
           Active Connectors
         </div>
         <p className="flex text-xl mx-auto font-semibold items-center text-lg mt-1">
@@ -112,7 +112,7 @@ function SummaryRow({
 
       {isPaidEnterpriseFeaturesEnabled && (
         <TableCell>
-          <div className="text-sm text-neutral-500 dark:text-neutral-300">
+          <div className="text-sm text-text-02">
             Public Connectors
           </div>
           <p className="flex text-xl mx-auto font-semibold items-center text-lg mt-1">
@@ -122,7 +122,7 @@ function SummaryRow({
       )}
 
       <TableCell>
-        <div className="text-sm text-neutral-500 dark:text-neutral-300">
+        <div className="text-sm text-text-02">
           Total Docs Indexed
         </div>
         <div className="text-xl font-semibold">
@@ -156,11 +156,11 @@ function ConnectorRow({
   return (
     <TableRow
       className={`
-  border border-border dark:border-neutral-700
-          hover:bg-accent-background ${
+  border border-border
+          hover:bg-background-tint-02 ${
             invisible
               ? "invisible !h-0 !-mb-10 !border-none"
-              : "!border border-border dark:border-neutral-700"
+              : "!border border-border"
           }  w-full cursor-pointer relative `}
       onClick={handleRowClick}
     >
@@ -237,11 +237,11 @@ function FederatedConnectorRow({
   return (
     <TableRow
       className={`
-  border border-border dark:border-neutral-700
-          hover:bg-accent-background ${
+  border border-border
+          hover:bg-background-tint-02 ${
             invisible
               ? "invisible !h-0 !-mb-10 !border-none"
-              : "!border border-border dark:border-neutral-700"
+              : "!border border-border"
           }  w-full cursor-pointer relative `}
       onClick={handleRowClick}
     >
@@ -341,7 +341,7 @@ export function CCPairIndexingStatusTable({
                 )}
                 {!sourceLoadingStates[ccPairStatus.source] && (
                   <>
-                    <TableRow className="border border-border dark:border-neutral-700">
+                    <TableRow className="border border-border">
                       <TableHead>Name</TableHead>
                       <TableHead>Last Indexed</TableHead>
                       <TableHead>Status</TableHead>
@@ -392,8 +392,8 @@ export function CCPairIndexingStatusTable({
                             key={`dummy-${ccPairStatus.source}-${index}`}
                             className={
                               isLastDummyRow
-                                ? "border-l border-r border-b border-border dark:border-neutral-700"
-                                : "border-l border-r border-t-0 border-b-0 border-border dark:border-neutral-700"
+                                ? "border-l border-r border-b border-border"
+                                : "border-l border-r border-t-0 border-b-0 border-border"
                             }
                             style={
                               isLastDummyRow
@@ -412,7 +412,7 @@ export function CCPairIndexingStatusTable({
                                     ? NUMBER_OF_COLUMNS
                                     : NUMBER_OF_COLUMNS - 1
                                 }
-                                className="h-[56px] text-center text-sm text-gray-400 dark:text-gray-500 border-b border-r border-l border-border dark:border-neutral-700"
+                                className="h-[56px] text-center text-sm text-text-02 border-b border-r border-l border-border"
                               >
                                 <span className="italic">
                                   All caught up! No more connectors to show
@@ -436,7 +436,7 @@ export function CCPairIndexingStatusTable({
                   </>
                 )}
                 {ccPairStatus.total_pages > 1 && (
-                  <TableRow className="border-l border-r border-b border-border dark:border-neutral-700">
+                  <TableRow className="border-l border-r border-b border-border">
                     <TableCell
                       colSpan={
                         isPaidEnterpriseFeaturesEnabled

@@ -77,7 +77,7 @@ export default function Logo({ folded, size, className }: LogoProps) {
             )}
             nowrap
           >
-            Powered by Onyx
+            Powered by Maticmind
           </Text>
         )}
       </div>
@@ -100,6 +100,6 @@ export default function Logo({ folded, size, className }: LogoProps) {
   ) : folded ? (
     <OnyxIcon size={foldedSize} className={cn("flex-shrink-0", className)} />
   ) : (
-    <OnyxLogoTypeIcon size={unfoldedSize} className={className} />
+    <OnyxLogoTypeIcon size={unfoldedSize} className={cn("flex-1", className)} />
   );
 }
