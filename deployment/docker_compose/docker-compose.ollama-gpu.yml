@@ -1,0 +1,44 @@
+# Docker Compose Override for Ollama GPU Support
+# This file provides GPU configurations for Ollama
+#
+# PREREQUISITES:
+#   1. Install nvidia-container-toolkit:
+#      Ubuntu/Debian: sudo apt-get install -y nvidia-container-toolkit
+#      RHEL/CentOS: sudo yum install -y nvidia-container-toolkit
+#   2. Configure Docker runtime:
+#      sudo nvidia-ctk runtime configure --runtime=docker
+#   3. Restart Docker:
+#      sudo systemctl restart docker
+#   4. Verify GPU access:
+#      docker run --rm --gpus all nvidia/cuda:12.0-base nvidia-smi
+#
+# USAGE:
+#   # All GPUs
+#   docker compose -f docker-compose.yml -f docker-compose.ollama-gpu.yml up -d
+#
+#   # With dev mode (exposed ports)
+#   docker compose -f docker-compose.yml -f docker-compose.dev.yml -f docker-compose.ollama-gpu.yml up -d
+
+name: onyx
+
+services:
+  ollama:
+    # Enable GPU support - Uses all available NVIDIA GPUs
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all  # Use all available GPUs
+              capabilities: [gpu]
+
+    # Optional: Increase performance settings when GPU is available
+    environment:
+      # Enable GPU optimizations
+      - OLLAMA_NUM_PARALLEL=${OLLAMA_NUM_PARALLEL:-4}
+      - OLLAMA_MAX_LOADED_MODELS=${OLLAMA_MAX_LOADED_MODELS:-3}
+      - OLLAMA_KEEP_ALIVE=${OLLAMA_KEEP_ALIVE:-10m}
+      # Larger context for GPU
+      - OLLAMA_NUM_CTX=${OLLAMA_NUM_CTX:-4096}
+      # Enable debug to see GPU detection
+      # - OLLAMA_DEBUG=1
