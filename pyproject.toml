@@ -132,6 +132,20 @@ backend = [
     "nest_asyncio==1.6.0",
     "openinference-instrumentation==0.1.42",
     "opentelemetry-proto>=1.39.0",
+    # OpenTelemetry Core for distributed tracing and observability (matching existing versions)
+    "opentelemetry-api>=1.39.0",
+    "opentelemetry-sdk>=1.39.0",
+    "opentelemetry-instrumentation>=0.60b0",
+    # OpenTelemetry OTLP Exporters
+    "opentelemetry-exporter-otlp-proto-grpc>=1.39.0",
+    "opentelemetry-exporter-otlp-proto-http>=1.39.0",
+    # OpenTelemetry Auto-instrumentation packages
+    "opentelemetry-instrumentation-fastapi>=0.50b0",
+    "opentelemetry-instrumentation-sqlalchemy>=0.50b0",
+    "opentelemetry-instrumentation-redis>=0.50b0",
+    "opentelemetry-instrumentation-requests>=0.50b0",
+    "opentelemetry-instrumentation-httpx>=0.50b0",
+    "opentelemetry-instrumentation-logging>=0.50b0",
     "python3-saml==1.15.0",
     "xmlsec==1.3.14",
 ]

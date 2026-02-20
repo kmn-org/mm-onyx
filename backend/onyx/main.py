@@ -134,6 +134,9 @@ from onyx.setup import setup_multitenant_onyx
 from onyx.setup import setup_onyx
 from onyx.tracing.braintrust_tracing import setup_braintrust_if_creds_available
 from onyx.tracing.langfuse_tracing import setup_langfuse_if_creds_available
+# OpenTelemetry Observability Integration
+from onyx.observability import setup_observability
+from onyx.observability import correlation_id_middleware
 from onyx.utils.logger import setup_logger
 from onyx.utils.logger import setup_uvicorn_logger
 from onyx.utils.middleware import add_onyx_request_id_middleware
@@ -278,6 +281,18 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     setup_braintrust_if_creds_available()
     setup_langfuse_if_creds_available()
 
+    # Initialize OpenTelemetry Observability
+    try:
+        setup_observability(
+            app=None,  # App will be instrumented separately in get_application
+            service_name="mm-onyx-api",
+            service_version=__version__,
+        )
+        logger.info("OpenTelemetry observability initialized successfully")
+    except Exception as e:
+        logger.warning(f"Failed to initialize OpenTelemetry: {e}")
+        # Continue without OpenTelemetry if it fails
+
     # fill up Postgres connection pools
     await warm_up_connections()
 
@@ -346,6 +361,15 @@ def get_application(lifespan_override: Lifespan | None = None) -> FastAPI:
         ],
         lifespan=lifespan_override or lifespan,
     )
+
+    # Instrument FastAPI with OpenTelemetry
+    try:
+        from onyx.observability import instrument_fastapi
+        instrument_fastapi(application)
+        logger.info("FastAPI instrumented with OpenTelemetry")
+    except Exception as e:
+        logger.warning(f"Failed to instrument FastAPI with OpenTelemetry: {e}")
+
     if SENTRY_DSN:
         sentry_sdk.init(
             dsn=SENTRY_DSN,
@@ -555,6 +579,13 @@ def get_application(lifespan_override: Lifespan | None = None) -> FastAPI:
         add_latency_logging_middleware(application, logger)
 
     add_onyx_request_id_middleware(application, "API", logger)
+
+    # Add Correlation ID Middleware for distributed tracing
+    try:
+        application.middleware("http")(correlation_id_middleware)
+        logger.info("Correlation ID middleware added for OpenTelemetry tracing")
+    except Exception as e:
+        logger.warning(f"Failed to add correlation ID middleware: {e}")
 
     # Ensure all routes have auth enabled or are explicitly marked as public
     check_router_auth(application)
