@@ -13,13 +13,9 @@ export const buildDocumentSummaryDisplay = (
   matchHighlights: string[],
   blurb: string
 ) => {
-  // if there are no match highlights, or if it's really short, just use the blurb
-  // this is to prevent the UI from showing something like `...` for the summary
-  const MIN_MATCH_HIGHLIGHT_LENGTH = 5;
-  if (
-    !matchHighlights ||
-    matchHighlights.length <= MIN_MATCH_HIGHLIGHT_LENGTH
-  ) {
+  // If there are no highlights or the total content is too short, fall back to blurb
+  const totalHighlightLength = matchHighlights?.join("").replace(/<[^>]+>/g, "").length ?? 0;
+  if (!matchHighlights || matchHighlights.length === 0 || totalHighlightLength < 5) {
     return blurb;
   }
 
@@ -121,6 +117,17 @@ export const buildDocumentSummaryDisplay = (
   return finalJSX;
 };
 
+function getTooltipPositionLabel(link?: string | null): string | null {
+  if (!link) return null;
+  const pageMatch = link.match(/#page=(\d+)/);
+  if (pageMatch) return `Page ${pageMatch[1]}`;
+  const slideMatch = link.match(/#slide=(\d+)/);
+  if (slideMatch) return `Slide ${slideMatch[1]}`;
+  const sheetMatch = link.match(/#sheet=(.+)/);
+  if (sheetMatch) return `Sheet: ${decodeURIComponent(sheetMatch[1] ?? "")}`;
+  return null;
+}
+
 interface CompactDocumentCardProps {
   document: OnyxDocument;
   updatePresentingDocument: (document: OnyxDocument) => void;
@@ -132,6 +139,10 @@ export function CompactDocumentCard({
 }: CompactDocumentCardProps) {
   const isWebSource =
     document.is_internet || document.source_type === ValidSources.Web;
+  const positionLabel = getTooltipPositionLabel(document.link);
+  const score = (document as any).score as number | null | undefined;
+  const scorePct =
+    score != null ? Math.round(Math.min(Math.max(score * 100, 0), 100)) : null;
 
   return (
     <Card className="shadow-00 w-[20rem]">
@@ -139,7 +150,7 @@ export function CompactDocumentCard({
         onClick={() => {
           openDocument(document, updatePresentingDocument);
         }}
-        className="max-w-[20rem] p-3 flex flex-col gap-1"
+        className="max-w-[20rem] p-3 flex flex-col gap-1.5"
       >
         <div className="flex flex-row gap-2 items-center w-full">
           {isWebSource && document.link ? (
@@ -151,6 +162,21 @@ export function CompactDocumentCard({
             {document.semantic_identifier ?? document.document_id}
           </Text>
         </div>
+
+        {(positionLabel || scorePct != null) && (
+          <div className="flex items-center gap-2">
+            {positionLabel && (
+              <span className="text-[11px] font-medium px-2 py-0.5 rounded-full bg-background-100 text-text-500 leading-none">
+                {positionLabel}
+              </span>
+            )}
+            {scorePct != null && (
+              <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-blue-50 text-blue-600 dark:bg-blue-950/40 dark:text-blue-400 leading-none">
+                {scorePct}% relevance
+              </span>
+            )}
+          </div>
+        )}
 
         {document.blurb && (
           <Text

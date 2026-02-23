@@ -19,6 +19,9 @@ from onyx.connectors.models import ImageSection
 from onyx.connectors.models import TextSection
 from onyx.file_processing.extract_file_text import extract_text_and_images
 from onyx.file_processing.extract_file_text import get_file_ext
+from onyx.file_processing.extract_file_text import read_pdf_pages
+from onyx.file_processing.extract_file_text import read_pptx_slides
+from onyx.file_processing.extract_file_text import read_xlsx_sheets
 from onyx.file_processing.file_types import OnyxFileExtensions
 from onyx.file_processing.image_utils import store_image_and_create_section
 from onyx.file_store.file_store import get_default_file_store
@@ -177,9 +180,39 @@ def _process_file(
         title = onyx_metadata.title or onyx_metadata.file_display_name or title
         link = onyx_metadata.link or link
 
-    # Build sections: first the text as a single Section
+    # Build sections: structured per-page/per-sheet/per-slide for supported types
     sections: list[TextSection | ImageSection] = []
-    if extraction_result.text_content.strip():
+    if extension == ".pdf":
+        file.seek(0)
+        pages, _ = read_pdf_pages(file, pdf_pass)
+        for page_num, page_text in pages:
+            if page_text.strip():
+                page_link = f"{link}#page={page_num}" if link else f"#page={page_num}"
+                sections.append(TextSection(link=page_link, text=page_text.strip()))
+        if not sections and extraction_result.text_content.strip():
+            logger.debug(f"PDF per-page extraction empty, falling back to full text for {file_name}")
+            sections.append(TextSection(link=link, text=extraction_result.text_content.strip()))
+    elif extension == ".xlsx":
+        file.seek(0)
+        xlsx_sheets = read_xlsx_sheets(file, file_name)
+        for sheet_name, sheet_text in xlsx_sheets:
+            if sheet_text.strip():
+                sheet_link = f"{link}#sheet={sheet_name}" if link else f"#sheet={sheet_name}"
+                sections.append(TextSection(link=sheet_link, text=sheet_text.strip()))
+        if not sections and extraction_result.text_content.strip():
+            logger.debug(f"XLSX per-sheet extraction empty, falling back to full text for {file_name}")
+            sections.append(TextSection(link=link, text=extraction_result.text_content.strip()))
+    elif extension == ".pptx":
+        file.seek(0)
+        pptx_slides = read_pptx_slides(file, file_name)
+        for slide_num, slide_text in pptx_slides:
+            if slide_text.strip():
+                slide_link = f"{link}#slide={slide_num}" if link else f"#slide={slide_num}"
+                sections.append(TextSection(link=slide_link, text=slide_text.strip()))
+        if not sections and extraction_result.text_content.strip():
+            logger.debug(f"PPTX per-slide extraction empty, falling back to full text for {file_name}")
+            sections.append(TextSection(link=link, text=extraction_result.text_content.strip()))
+    elif extraction_result.text_content.strip():
         logger.debug(f"Creating TextSection for {file_name} with link: {link}")
         sections.append(
             TextSection(link=link, text=extraction_result.text_content.strip())

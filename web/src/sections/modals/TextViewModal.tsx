@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import Button from "@/refresh-components/buttons/Button";
 import {
   Table,
@@ -26,8 +26,14 @@ import ScrollIndicatorDiv from "@/refresh-components/ScrollIndicatorDiv";
 import { cn } from "@/lib/utils";
 import { Section } from "@/layouts/general-layouts";
 
+// At runtime presentingDocument may be a full OnyxDocument (with link, match_highlights, blurb).
+// We accept the extra optional fields without breaking existing callers that pass MinimalOnyxDocument.
 export interface TextViewProps {
-  presentingDocument: MinimalOnyxDocument;
+  presentingDocument: MinimalOnyxDocument & {
+    link?: string | null;
+    match_highlights?: string[];
+    blurb?: string;
+  };
   onClose: () => void;
 }
 
@@ -35,6 +41,15 @@ export default function TextViewModal({
   presentingDocument,
   onClose,
 }: TextViewProps) {
+  // Extract page/slide/sheet anchor from the document link (e.g. "#page=3")
+  const pdfPageNumber = useMemo(() => {
+    const m = presentingDocument.link?.match(/#page=(\d+)/);
+    return m ? m[1] : null;
+  }, [presentingDocument.link]);
+
+  // Ref for the text content container — used to scroll to the relevant chunk
+  const contentRef = useRef<HTMLDivElement>(null);
+
   const [zoom, setZoom] = useState(100);
   const [fileContent, setFileContent] = useState("");
   const [fileUrl, setFileUrl] = useState("");
@@ -180,6 +195,76 @@ export default function TextViewModal({
     };
   }, [fileUrl]);
 
+  // Scroll to and briefly highlight the relevant chunk in text/markdown documents
+  useEffect(() => {
+    if (isLoading || !fileContent || !contentRef.current) return;
+    const highlights = presentingDocument.match_highlights;
+    if (!highlights?.length) return;
+
+    // Build a set of candidate search keys from all highlights (shortest first for reliability)
+    const searchKeys: string[] = [];
+    highlights.forEach((h) => {
+      const clean = h
+        ?.replace(/<hi>/g, "")
+        ?.replace(/<\/hi>/g, "")
+        ?.trim();
+      if (clean && clean.length >= 10) {
+        // Try progressively shorter keys: 30 chars is reliable across split nodes
+        searchKeys.push(clean.slice(0, 30).trim());
+      }
+    });
+    if (searchKeys.length === 0) return;
+
+    const timer = setTimeout(() => {
+      if (!contentRef.current) return;
+
+      // Walk ELEMENT nodes (not text nodes) — element.textContent aggregates
+      // all descendant text, so it works even when markdown splits text across
+      // inline elements (bold, italic, code, etc.)
+      const BLOCK_TAGS = new Set([
+        "p", "li", "h1", "h2", "h3", "h4", "h5", "h6",
+        "td", "th", "blockquote", "pre", "div",
+      ]);
+
+      const walker = document.createTreeWalker(
+        contentRef.current,
+        NodeFilter.SHOW_ELEMENT
+      );
+
+      let found: Element | null = null;
+      outer: {
+        let node: Node | null = walker.nextNode();
+        while (node) {
+          const el = node as Element;
+          if (BLOCK_TAGS.has(el.tagName.toLowerCase())) {
+            const text = el.textContent ?? "";
+            for (const key of searchKeys) {
+              if (text.includes(key)) {
+                found = el;
+                break outer;
+              }
+            }
+          }
+          node = walker.nextNode();
+        }
+      }
+
+      if (found) {
+        found.scrollIntoView({ behavior: "smooth", block: "center" });
+        const el = found as HTMLElement;
+        const prev = el.style.backgroundColor;
+        el.style.backgroundColor = "rgba(234, 179, 8, 0.3)";
+        el.style.borderRadius = "3px";
+        setTimeout(() => {
+          el.style.backgroundColor = prev;
+          el.style.borderRadius = "";
+        }, 2500);
+      }
+    }, 200);
+
+    return () => clearTimeout(timer);
+  }, [fileContent, isLoading, presentingDocument.match_highlights]);
+
   const handleDownload = () => {
     const link = document.createElement("a");
     link.href = fileUrl;
@@ -256,7 +341,7 @@ export default function TextViewModal({
                   />
                 ) : isSupportedIframeFormat(fileType) ? (
                   <iframe
-                    src={`${fileUrl}#toolbar=0`}
+                    src={`${fileUrl}#${pdfPageNumber ? `page=${pdfPageNumber}&` : ""}toolbar=0`}
                     className="w-full h-full flex-1 min-h-0 border-none"
                     title="File Viewer"
                   />
@@ -265,6 +350,7 @@ export default function TextViewModal({
                     className="flex-1 min-h-0 p-4"
                     variant="shadow"
                   >
+                    <div ref={contentRef}>
                     {csvData ? (
                       <Table>
                         <TableHeader className="sticky top-0 z-sticky">
@@ -308,6 +394,7 @@ export default function TextViewModal({
                         className="w-full pb-4 h-full text-lg break-words"
                       />
                     )}
+                    </div>
                   </ScrollIndicatorDiv>
                 ) : (
                   <div className="flex flex-col items-center justify-center flex-1 min-h-0 p-6 gap-4">

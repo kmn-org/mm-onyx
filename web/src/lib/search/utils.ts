@@ -23,15 +23,17 @@ export function endsWithLetterOrNumber(str: string) {
   return /[a-zA-Z0-9]$/.test(str);
 }
 
-// If we have a link, open it in a new tab (including if it's a file)
-// If above fails and we have a file, update the presenting document
+// If we have a real URL link, open it in a new tab.
+// Fragment-only links (e.g. "#page=3") are internal position anchors — open the modal instead.
+// If there is no link, try to present via modal for file sources.
 export const openDocument = (
   document: OnyxDocument,
   updatePresentingDocument?: (document: OnyxDocument) => void
 ) => {
-  if (document.link) {
+  const isFragmentOnly = document.link?.startsWith("#") ?? false;
+  if (document.link && !isFragmentOnly) {
     window.open(document.link, "_blank");
-  } else if (document.source_type === ValidSources.File) {
+  } else {
     updatePresentingDocument?.(document);
   }
 };

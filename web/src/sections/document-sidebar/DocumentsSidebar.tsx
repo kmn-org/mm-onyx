@@ -2,7 +2,6 @@
 
 import { MinimalOnyxDocument, OnyxDocument } from "@/lib/search/interfaces";
 import ChatDocumentDisplay from "@/sections/document-sidebar/ChatDocumentDisplay";
-import { removeDuplicateDocs } from "@/lib/documentUtils";
 import { Dispatch, SetStateAction, useMemo, memo } from "react";
 import { getCitations } from "@/app/app/services/packetUtils";
 import {
@@ -38,12 +37,27 @@ const buildOnyxDocumentFromFile = (
   } as any;
 };
 
+/** Group documents by document_id, deduplicating by (document_id, chunk_ind). */
+function groupDocuments(docs: OnyxDocument[]): Map<string, OnyxDocument[]> {
+  const seenChunks = new Set<string>();
+  const groups = new Map<string, OnyxDocument[]>();
+  docs.forEach((doc) => {
+    const chunkKey = `${doc.document_id}::${doc.chunk_ind}`;
+    if (seenChunks.has(chunkKey)) return;
+    seenChunks.add(chunkKey);
+    if (!groups.has(doc.document_id)) groups.set(doc.document_id, []);
+    groups.get(doc.document_id)!.push(doc);
+  });
+  return groups;
+}
+
 interface HeaderProps {
   children: string;
+  count?: number;
   onClose: () => void;
 }
 
-function Header({ children, onClose }: HeaderProps) {
+function Header({ children, count, onClose }: HeaderProps) {
   return (
     <div className="sticky top-0 z-sticky bg-background-tint-01">
       <div className="flex flex-row w-full items-center justify-between gap-2 py-3">
@@ -52,6 +66,11 @@ function Header({ children, onClose }: HeaderProps) {
           <Text as="p" headingH3 text03>
             {children}
           </Text>
+          {count !== undefined && (
+            <span className="ml-1 text-[11px] font-semibold px-1.5 py-0.5 rounded-full bg-background-200 text-text-500 tabular-nums leading-none">
+              {count}
+            </span>
+          )}
         </div>
         <IconButton
           icon={SvgX}
@@ -114,7 +133,6 @@ const DocumentsSidebar = memo(
       const citations = getCitations(selectedMessage.packets);
       citations.forEach((citation, index) => {
         citedDocumentIds.add(citation.document_id);
-        // Only set the order for the first occurrence
         if (!citationOrder.has(citation.document_id)) {
           citationOrder.set(citation.document_id, index);
         }
@@ -122,9 +140,6 @@ const DocumentsSidebar = memo(
       return { citedDocumentIds, citationOrder };
     }, [idOfMessageToDisplay, selectedMessage?.packets.length]);
 
-    // if these are missing for some reason, then nothing we can do. Just
-    // don't render.
-    // TODO: improve this display
     if (!selectedMessage || !currentMessageTree) return null;
 
     const humanMessage = selectedMessage.parentNodeId
@@ -135,29 +150,29 @@ const DocumentsSidebar = memo(
     );
     const selectedDocumentIds =
       selectedDocuments?.map((document) => document.document_id) || [];
+
     const currentDocuments = selectedMessage.documents || null;
-    const dedupedDocuments = removeDuplicateDocs(currentDocuments || []);
-    const citedDocuments = dedupedDocuments
-      .filter(
-        (doc) =>
-          doc.document_id !== null &&
-          doc.document_id !== undefined &&
-          citedDocumentIds.has(doc.document_id)
-      )
-      .sort((a, b) => {
-        // Sort by citation order (order citations appeared in the answer)
-        const orderA = citationOrder.get(a.document_id) ?? Infinity;
-        const orderB = citationOrder.get(b.document_id) ?? Infinity;
+
+    // Group all documents by document_id, preserving all chunks
+    const allGroups = groupDocuments(currentDocuments || []);
+
+    // Separate into cited groups (sorted by citation order) and other groups
+    const allGroupEntries = Array.from(allGroups.entries());
+
+    const citedGroupEntries = allGroupEntries
+      .filter(([docId]) => citedDocumentIds.has(docId))
+      .sort(([aId], [bId]) => {
+        const orderA = citationOrder.get(aId) ?? Infinity;
+        const orderB = citationOrder.get(bId) ?? Infinity;
         return orderA - orderB;
       });
-    const otherDocuments = dedupedDocuments.filter(
-      (doc) =>
-        doc.document_id === null ||
-        doc.document_id === undefined ||
-        !citedDocumentIds.has(doc.document_id)
+
+    const otherGroupEntries = allGroupEntries.filter(
+      ([docId]) => !citedDocumentIds.has(docId)
     );
-    const hasCited = citedDocuments.length > 0;
-    const hasOther = otherDocuments.length > 0;
+
+    const hasCited = citedGroupEntries.length > 0;
+    const hasOther = otherGroupEntries.length > 0;
 
     return (
       <div
@@ -167,38 +182,49 @@ const DocumentsSidebar = memo(
         <div className="flex flex-col px-3 gap-6">
           {hasCited && (
             <div>
-              <Header onClose={closeSidebar}>Cited Sources</Header>
+              <Header onClose={closeSidebar} count={citedGroupEntries.length}>
+                Cited Sources
+              </Header>
               <ChatDocumentDisplayWrapper>
-                {citedDocuments.map((document) => (
-                  <ChatDocumentDisplay
-                    key={document.document_id}
-                    setPresentingDocument={setPresentingDocument}
-                    modal={modal}
-                    document={document}
-                    isSelected={selectedDocumentIds.includes(
-                      document.document_id
-                    )}
-                  />
-                ))}
+                {citedGroupEntries.map(([docId, chunks]) =>
+                  chunks.map((chunk, i) => (
+                    <ChatDocumentDisplay
+                      key={`${docId}::${chunk.chunk_ind}`}
+                      setPresentingDocument={setPresentingDocument}
+                      modal={modal}
+                      document={chunk}
+                      isSelected={selectedDocumentIds.includes(chunk.document_id)}
+                      totalGroupChunks={chunks.length > 1 ? chunks.length : undefined}
+                      chunkIndexInGroup={chunks.length > 1 ? i : undefined}
+                      citationCount={i === 0 && chunks.length > 1 ? chunks.length : undefined}
+                    />
+                  ))
+                )}
               </ChatDocumentDisplayWrapper>
             </div>
           )}
 
           {hasOther && (
             <div>
-              <Header onClose={closeSidebar}>
-                {citedDocuments.length > 0 ? "More" : "Found Sources"}
+              <Header
+                onClose={closeSidebar}
+                count={otherGroupEntries.length}
+              >
+                {citedGroupEntries.length > 0 ? "More" : "Found Sources"}
               </Header>
               <ChatDocumentDisplayWrapper>
-                {otherDocuments.map((document) => (
+                {otherGroupEntries.map(([docId, chunks]) => (
+                  // For "other" section show only the best chunk (highest score)
                   <ChatDocumentDisplay
-                    key={document.document_id}
+                    key={docId}
                     setPresentingDocument={setPresentingDocument}
                     modal={modal}
-                    document={document}
-                    isSelected={selectedDocumentIds.includes(
-                      document.document_id
-                    )}
+                    document={
+                      chunks.reduce((best, c) =>
+                        (c.score ?? 0) > (best.score ?? 0) ? c : best
+                      )
+                    }
+                    isSelected={selectedDocumentIds.includes(docId)}
                   />
                 ))}
               </ChatDocumentDisplayWrapper>
@@ -207,7 +233,9 @@ const DocumentsSidebar = memo(
 
           {humanFileDescriptors && humanFileDescriptors.length > 0 && (
             <div>
-              <Header onClose={closeSidebar}>User Files</Header>
+              <Header onClose={closeSidebar} count={humanFileDescriptors.length}>
+                User Files
+              </Header>
               <ChatDocumentDisplayWrapper>
                 {humanFileDescriptors.map((file) => (
                   <ChatDocumentDisplay

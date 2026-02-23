@@ -70,6 +70,7 @@ export interface OnyxDocument extends MinimalOnyxDocument {
   updated_at: string | null;
   db_doc_id?: number;
   is_internet: boolean;
+  primary_owners?: string[] | null;
   validationState?: null | "good" | "bad";
 }
 

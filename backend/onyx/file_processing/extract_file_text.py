@@ -256,6 +256,57 @@ def read_pdf_file(
     return "", metadata, []
 
 
+def read_pdf_pages(
+    file: IO[Any],
+    pdf_pass: str | None = None,
+) -> tuple[list[tuple[int, str]], dict[str, Any]]:
+    """
+    Extract per-page text and metadata from a PDF.
+    Returns: ([(page_number_1based, text), ...], metadata_dict)
+    """
+    from pypdf import PdfReader
+    from pypdf.errors import PdfStreamError
+
+    metadata: dict[str, Any] = {}
+    pages: list[tuple[int, str]] = []
+    try:
+        pdf_reader = PdfReader(file)
+
+        if pdf_reader.is_encrypted and pdf_pass is not None:
+            decrypt_success = False
+            try:
+                decrypt_success = pdf_reader.decrypt(pdf_pass) != 0
+            except Exception:
+                logger.error("Unable to decrypt pdf")
+            if not decrypt_success:
+                return [], metadata
+        elif pdf_reader.is_encrypted:
+            logger.warning("No Password for an encrypted PDF, returning empty pages.")
+            return [], metadata
+
+        if pdf_reader.metadata is not None:
+            for key, value in pdf_reader.metadata.items():
+                clean_key = key.lstrip("/")
+                if isinstance(value, str) and value.strip():
+                    metadata[clean_key] = value
+                elif isinstance(value, list) and all(
+                    isinstance(item, str) for item in value
+                ):
+                    metadata[clean_key] = ", ".join(value)
+
+        for page_num, page in enumerate(pdf_reader.pages, 1):
+            text = page.extract_text() or ""
+            if text.strip():
+                pages.append((page_num, text))
+
+    except PdfStreamError:
+        logger.exception("Invalid PDF file")
+    except Exception:
+        logger.exception("Failed to read PDF pages")
+
+    return pages, metadata
+
+
 def extract_docx_images(docx_bytes: IO[Any]) -> Iterator[tuple[bytes, str]]:
     """
     Given the bytes of a docx file, extract all the images.
@@ -415,6 +466,83 @@ def xlsx_to_text(file: IO[Any], file_name: str = "") -> str:
         sheet_str = "\n".join(rows)
         text_content.append(sheet_str)
     return TEXT_SECTION_SEPARATOR.join(text_content)
+
+
+def read_xlsx_sheets(
+    file: IO[Any],
+    file_name: str = "",
+) -> list[tuple[str, str]]:
+    """
+    Extract per-sheet text from an XLSX file.
+    Returns: [(sheet_name, text), ...]
+    """
+    sheets: list[tuple[str, str]] = []
+    try:
+        workbook = openpyxl.load_workbook(file, read_only=True)
+    except BadZipFile as e:
+        error_str = f"Failed to extract sheets from {file_name or 'xlsx file'}: {e}"
+        if file_name.startswith("~"):
+            logger.debug(error_str + " (this is expected for files with ~)")
+        else:
+            logger.warning(error_str)
+        return []
+    except Exception as e:
+        if any(s in str(e) for s in KNOWN_OPENPYXL_BUGS):
+            logger.error(
+                f"Failed to extract sheets from {file_name or 'xlsx file'}. "
+                f"This happens due to a bug in openpyxl. {e}"
+            )
+            return []
+        raise e
+
+    for sheet in workbook.worksheets:
+        rows = []
+        num_empty_consecutive_rows = 0
+        for row in sheet.iter_rows(min_row=1, values_only=True):
+            row_str = ",".join(str(cell or "") for cell in row)
+            if len(row_str) >= len(row):
+                rows.append(row_str)
+                num_empty_consecutive_rows = 0
+            else:
+                num_empty_consecutive_rows += 1
+            if num_empty_consecutive_rows > 100:
+                logger.warning(
+                    f"Found {num_empty_consecutive_rows} empty rows in sheet "
+                    f"'{sheet.title}' of {file_name}, skipping rest of sheet"
+                )
+                break
+        sheet_text = "\n".join(rows)
+        if sheet_text.strip():
+            sheets.append((sheet.title, sheet_text))
+
+    return sheets
+
+
+def read_pptx_slides(
+    file: IO[Any],
+    file_name: str = "",
+) -> list[tuple[int, str]]:
+    """
+    Extract per-slide text from a PPTX file using python-pptx.
+    Returns: [(slide_number_1based, text), ...]
+    """
+    from pptx import Presentation  # type: ignore
+
+    slides: list[tuple[int, str]] = []
+    try:
+        prs = Presentation(to_bytesio(file))
+        for slide_num, slide in enumerate(prs.slides, 1):
+            text_parts = []
+            for shape in slide.shapes:
+                if hasattr(shape, "text") and shape.text.strip():
+                    text_parts.append(shape.text.strip())
+            slide_text = "\n".join(text_parts)
+            if slide_text.strip():
+                slides.append((slide_num, slide_text))
+    except Exception:
+        logger.exception(f"Failed to read PPTX slides from {file_name or 'pptx file'}")
+
+    return slides
 
 
 def eml_to_text(file: IO[Any]) -> str:

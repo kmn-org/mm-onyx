@@ -62,10 +62,9 @@ export function Citation({
   }
   const sourceType = document_info?.document?.source_type;
   const title = document_info?.document?.semantic_identifier;
-  const citationText =
-    (sourceType && sourceType != ValidSources.Web
-      ? getSourceDisplayName(sourceType)
-      : truncateText(title || "", MAX_CITATION_TEXT_LENGTH)) || "Unknown";
+  const citationText = title
+    ? truncateText(title, MAX_CITATION_TEXT_LENGTH)
+    : (sourceType ? getSourceDisplayName(sourceType) : "Unknown");
 
   return (
     <TooltipProvider>
