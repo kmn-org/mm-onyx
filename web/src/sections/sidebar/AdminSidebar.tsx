@@ -301,11 +301,11 @@ const collections = (
                 ]
               : []),
             // Always show billing/upgrade - community users need access to upgrade
-            {
-              name: hasSubscription ? "Plans & Billing" : "Upgrade Plan",
-              icon: hasSubscription ? SvgWallet : SvgArrowUpCircle,
-              link: "/admin/billing",
-            },
+            // {
+            //   name: hasSubscription ? "Plans & Billing" : "Upgrade Plan",
+            //   icon: hasSubscription ? SvgWallet : SvgArrowUpCircle,
+            //   link: "/admin/billing",
+            // },
           ],
         },
       ]

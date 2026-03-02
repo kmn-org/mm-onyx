@@ -128,7 +128,7 @@ const iconClasses = (transient: boolean | undefined) =>
     main: {
       primary: {
         enabled: ["stroke-text-inverted-05"],
-        disabled: ["stroke-text-inverted-05"],
+        disabled: ["stroke-text-03"],
       },
       secondary: {
         enabled: [

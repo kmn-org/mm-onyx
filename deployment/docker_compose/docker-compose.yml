@@ -87,6 +87,7 @@ services:
       - OTEL_SERVICE_NAME=mm-onyx-api
       - OTEL_SERVICE_VERSION=${IMAGE_TAG:-latest}
       - ENVIRONMENT=${ENVIRONMENT:-production}
+      - ENABLE_PAID_ENTERPRISE_EDITION_FEATURES=${ENABLE_PAID_ENTERPRISE_EDITION_FEATURES:-true}
     # PRODUCTION: Uncomment the line below to use if IAM_AUTH is true and you are using iam auth for postgres
     # volumes:
     #   - ./bundle.pem:/app/bundle.pem:ro
@@ -170,6 +171,7 @@ services:
       - OTEL_SERVICE_NAME=mm-onyx-background
       - OTEL_SERVICE_VERSION=${IMAGE_TAG:-latest}
       - ENVIRONMENT=${ENVIRONMENT:-production}
+      - ENABLE_PAID_ENTERPRISE_EDITION_FEATURES=${ENABLE_PAID_ENTERPRISE_EDITION_FEATURES:-true}
     # PRODUCTION: Uncomment the line below to use if IAM_AUTH is true and you are using iam auth for postgres
     # volumes:
     #   - ./bundle.pem:/app/bundle.pem:ro
@@ -220,6 +222,7 @@ services:
     restart: unless-stopped
     environment:
       - INTERNAL_URL=${INTERNAL_URL:-http://api_server:8080}
+      - ENABLE_PAID_ENTERPRISE_EDITION_FEATURES=${ENABLE_PAID_ENTERPRISE_EDITION_FEATURES:-true}
 
   # Uncomment the block below to enable the MCP server for Onyx.
   # mcp_server:
